@@ -1,0 +1,12 @@
+.oculto {
+  display: none !important;
+}
+
+.notification-icon {
+  position: fixed;
+  top: 1em;
+  right: 6.4em;
+  z-index: 2;
+  cursor: pointer;
+  width: 20px;
+}
