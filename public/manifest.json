@@ -1,8 +1,8 @@
 {
-  "name": "Sistema de Administración de Turnos",
-  "short_name": "SATURNO",
-  "theme_color": "#1dbd40",
-  "background_color": "#1dbd40",
+  "name": "Turnos | Bares & Resto",
+  "short_name": "Saturno Bares",
+  "theme_color": "#151515",
+  "background_color": "#151515",
   "display": "standalone",
   "orientation": "portrait",
   "Scope": "/",

@@ -3,7 +3,7 @@ import uniqueValidator from 'mongoose-unique-validator';
 import bcrypt from 'bcrypt';
 
 var rolesValidos = {
-    values: ["SUPERUSER_ROLE", "ADMIN_ROLE", "ASSISTANT_ROLE"],
+    values: ["SUPERUSER_ROLE", "ADMIN_ROLE", "WAITER_ROLE"],
     message: "{VALUE} no es un rol permitido"
   };
   
@@ -12,9 +12,8 @@ const userSchema = new Schema({
     tx_email: {type: String, unique: true, required: [true, 'El email es necesario']},
     tx_password: {type: String, required: [true, 'El password es necesario']},
     id_company: {type: String, ref: 'Company', required: false},
-    tx_role: {type: String, required: [true, 'El rol del usuario es necesario']},
+    id_role: {type: String, required: [true, 'El rol del usuario es necesario']},
     cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
-    id_skills: [{type: String, ref: 'Skill' , required: false}],
     tx_img: {type: String, required: false},
     bl_google: {type: Boolean, required: true, default: false},
     fc_lastlogin: { type: Date, required: false },
@@ -47,9 +46,8 @@ interface User extends Document {
     tx_email: string;
     tx_password: string;
     id_company: string;
-    tx_role: string;
+    id_role: string;
     cd_pricing: number;
-    id_skills: string[];
     tx_img: string;
     bl_google: boolean;
     fc_lastlogin: Date | null;

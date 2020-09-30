@@ -1,35 +1,35 @@
 import { Request, Response } from 'express';
-import { Desktop } from '../models/desktop.model';
+import { Table } from '../models/table.model';
 
 // ========================================================
 // Indicator Methods
 // ========================================================
 
-function createDesktop(req: Request, res: Response) {
+function createTable(req: Request, res: Response) {
 
     var body = req.body;
-    var desktop = new Desktop({
+    var table = new Table({
         id_company: body.id_company,
-        cd_desktop: body.cd_desktop,
-        id_assistant: body.id_assistant
+        cd_table: body.cd_table,
+        id_waiter: body.id_waiter
     });
 
-    desktop.save().then((desktopSaved) => {
+    table.save().then((tableSaved) => {
         res.status(200).json({
             ok: true,
             msg: 'Escritorio guardado correctamente',
-            desktop: desktopSaved
+            table: tableSaved
         })
     }).catch((err) => {
         res.status(400).json({
             ok: false,
             msg: err.message,
-            desktop: null
+            table: null
         })
     })
 }
 
 
 export = {
-    createDesktop
+    createTable
 }

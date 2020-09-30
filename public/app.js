@@ -13,7 +13,7 @@ var btnDesactivadas = document.getElementById('notifDesactivadas')
 
 // obtiene la public key
 function getPublicKey () {
-  return fetch('https://webturnos.herokuapp.com/n/key')
+  return fetch('https://saturno-fun.herokuapp.com/n/key')
     .then(res => res.arrayBuffer())
     .then(key => new Uint8Array(key))
 }
@@ -39,7 +39,7 @@ btnDesactivadas.addEventListener('click', function () {
       })
       .then(res => res.toJSON())
       .then(suscripcion => {
-        fetch('https://webturnos.herokuapp.com/n/subscribe', {
+        fetch('https://saturno-fun.herokuapp.com/n/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(suscripcion)

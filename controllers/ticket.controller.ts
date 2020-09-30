@@ -5,9 +5,9 @@ import Server from '../classes/server';
 import { Ticket } from '../models/ticket.model';
 import { Position } from '../models/position.model';
 import { User } from '../models/user.model';
-import { Skill } from '../models/skill.model';
-import { Desktop } from '../models/desktop.model';
+import { Table } from '../models/table.model';
 import { Session } from '../models/session.model';
+import { Section } from '../models/section.model';
 
 const server = Server.instance; // singleton
 
@@ -18,7 +18,7 @@ const server = Server.instance; // singleton
 
 function createTicket(req: Request, res: Response) {
 
-	const { idSkill, idSocket, blPriority } = req.body;
+	const { idCompany, idSession, idSocket, blPriority } = req.body;
 
 	const idDay = + new Date().getDate();
 	const idMonth = + new Date().getMonth() + 1;
@@ -26,36 +26,36 @@ function createTicket(req: Request, res: Response) {
 
 	let idPosition: number;
 
-	Skill.findById(idSkill).then(skillDB => {
+	Session.findById(idSession).then(sessionDB => {
 
-		if (!skillDB) {
+		if (!sessionDB) {
 			return res.status(400).json({
 				ok: false,
-				msg: 'No existe el skill solicitado',
+				msg: 'No existe la session de mesa solicitada',
 				ticket: null
 			})
 		}
 
 		// busco la posición que le corresponde
 		Position.findOneAndUpdate({
-			id_skill: idSkill,
+			id_session: idSession,
 			id_year: idYear,
 			id_month: idMonth,
 			id_day: idDay
-		}, { $inc: { id_position: 1 } }, { new: true }).then((skillNextNumber) => {
+		}, { $inc: { id_position: 1 } }, { new: true }).then((sessionNextNumber) => {
 
 			// si no existe el primer turno lo crea
-			if (!skillNextNumber) {
+			if (!sessionNextNumber) {
 
-				let newSkillNumber = new Position({
-					id_skill: idSkill,
+				let newSessionNumber = new Position({
+					id_session: idSession,
 					id_year: idYear,
 					id_month: idMonth,
 					id_day: idDay,
 					id_position: 1
 				})
 
-				newSkillNumber.save()
+				newSessionNumber.save()
 					.catch(() => {
 						return res.status(400).json({
 							ok: false,
@@ -63,38 +63,32 @@ function createTicket(req: Request, res: Response) {
 						});
 					})
 
-				idPosition = newSkillNumber.id_position;
+				idPosition = newSessionNumber.id_position;
 			}
 
-			if (skillNextNumber) {
-				idPosition = skillNextNumber.id_position;
+			if (sessionNextNumber) {
+				idPosition = sessionNextNumber.id_position;
 			}
 
-			let idCompany = skillDB.id_company;
 			// guardo el ticket
 			let ticket = new Ticket({
-				id_root: null,
-				id_child: null,
-				bl_priority: blPriority,
+				id_session: idSession,
 				id_position: idPosition,
-				id_socket: idSocket,
-				id_socket_desk: null,
-				id_session: null,
-				id_company: idCompany,
-				id_skill: idSkill,
+				bl_priority: blPriority,
+				id_socket_client: idSocket,
+				id_socket_waiter: null,
 				tm_start: + new Date().getTime(),
 				tm_att: null,
 				tm_end: null
 			})
 
-			ticket.id_root = ticket._id;
 			ticket.save().then((ticketSaved) => {
 
 				const server = Server.instance;
 				// welcome message to client
 				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
 				// advice to dekstops in company
-				server.io.to(idCompany).emit('update-desktops');
+				server.io.to(idCompany).emit('update-tables');
 
 				res.status(201).json({
 					ok: true,
@@ -124,7 +118,7 @@ function createTicket(req: Request, res: Response) {
 	}).catch(() => {
 		return res.status(400).json({
 			ok: false,
-			msg: 'No se pudo obtener el skill solicitado',
+			msg: 'No se pudo obtener el session solicitado',
 			ticket: null
 		})
 	})
@@ -137,12 +131,12 @@ function cancelTicket(req: Request, res: Response) {
 	Ticket.findByIdAndUpdate(idTicket, { tm_end: + new Date().getTime() }).then((ticketCanceled) => {
 		if (ticketCanceled) {
 
-			if (ticketCanceled.id_socket_desk) {
-				// cancel dekstop session and update tickets on assistant desktop 
-				server.io.to(ticketCanceled.id_socket_desk).emit('ticket-cancelled', ticketCanceled._id);
+			if (ticketCanceled.id_socket_waiter) {
+				// cancel dekstop session and update tickets on waiter table 
+				server.io.to(ticketCanceled.id_socket_waiter).emit('ticket-cancelled', ticketCanceled._id);
 			} else {
-				// update tickets on desktops
-				server.io.to(ticketCanceled.id_company).emit('update-desktops');
+				// update tickets on tables
+				server.io.to(ticketCanceled.id_company).emit('update-tables');
 			}
 
 			return res.status(200).json({
@@ -161,14 +155,13 @@ function cancelTicket(req: Request, res: Response) {
 }
 
 // ========================================================
-// assistant methods
+// waiter methods
 // ========================================================
 
 function reassignTicket(req: Request, res: Response) {
-	// desvía un ticket de un skill a otro dejando en el ticket un id_parent con el id del documento original 
-	// un id_child con el nuevo ticket creado en el nuevo skill. 
+	// desvía un ticket de una session de msa a otranuevo session. 
 
-	const { idTicket, idSkill, blPriority } = req.body;
+	const { idTicket, idSession, blPriority } = req.body;
 
 	const idDay = + new Date().getDate();
 	const idMonth = + new Date().getMonth() + 1;
@@ -176,9 +169,9 @@ function reassignTicket(req: Request, res: Response) {
 
 	let idPosition: number;
 
-	Ticket.findById(idTicket).then(ticketParentDB => {
+	Ticket.findById(idTicket).then(ticketDB => {
 
-		if (!ticketParentDB) {
+		if (!ticketDB) {
 			return res.status(400).json({
 				ok: false,
 				msg: 'No existe el ticket a reenviar',
@@ -186,36 +179,36 @@ function reassignTicket(req: Request, res: Response) {
 			})
 		}
 
-		Skill.findById(idSkill).then((skillDB) => {
+		Session.findById(idSession).then((sessionDB) => {
 
-			if (!skillDB) {
+			if (!sessionDB) {
 				return res.status(400).json({
 					ok: false,
-					msg: 'No existe el skill solicitado',
+					msg: 'No existe el session solicitado',
 					ticket: null
 				})
 			}
 
 			// busco la posición que le corresponde
 			Position.findOneAndUpdate({
-				id_skill: idSkill,
+				id_session: idSession,
 				id_year: idYear,
 				id_month: idMonth,
 				id_day: idDay
-			}, { $inc: { id_position: 1 } }, { new: true }).then((skillNextNumber) => {
+			}, { $inc: { id_position: 1 } }, { new: true }).then((sessionNextNumber) => {
 
-				if (!skillNextNumber) {
+				if (!sessionNextNumber) {
 					// si no existe el primer turno lo crea
 
-					let newSkillNumber = new Position({
-						id_skill: idSkill,
+					let newSessionNumber = new Position({
+						id_session: idSession,
 						id_year: idYear,
 						id_month: idMonth,
 						id_day: idDay,
 						id_position: 1
 					})
 
-					newSkillNumber.save()
+					newSessionNumber.save()
 						.catch(() => {
 							return res.status(400).json({
 								ok: false,
@@ -223,30 +216,27 @@ function reassignTicket(req: Request, res: Response) {
 							});
 						})
 
-					idPosition = newSkillNumber.id_position;
+					idPosition = newSessionNumber.id_position;
 				}
 
-				if (skillNextNumber) {
-					idPosition = skillNextNumber.id_position;
+				if (sessionNextNumber) {
+					idPosition = sessionNextNumber.id_position;
 				}
 
 
 
-				let idCompany = skillDB.id_company;
-				let idSocket = ticketParentDB.id_socket;
-				let idRoot = ticketParentDB.id_root;
+				let idCompany = ticketDB.id_company;
+				let idSocket = ticketDB.id_socket_client;
+
 				// guardo el ticket
 
 				let ticket = new Ticket({
-					id_root: idRoot,
-					id_child: null,
-					bl_priority: blPriority,
-					id_position: idPosition,
-					id_socket: idSocket,
-					id_socket_desk: null,
-					id_session: null,
 					id_company: idCompany,
-					id_skill: idSkill,
+					id_session: idSession,
+					id_position: idPosition,
+					bl_priority: blPriority,
+					id_socket_client: idSocket,
+					id_socket_waiter: null,
 					tm_start: + new Date().getTime(),
 					tm_att: null,
 					tm_end: null
@@ -260,13 +250,11 @@ function reassignTicket(req: Request, res: Response) {
 					server.io.to(idCompany).emit('update-public');
 
 					let ticketToUser = {
-						id_root: ticketChildSaved.id_root,
+						id_session: idSession,
 						id_position: ticketChildSaved.id_position,
-						id_socket: ticketChildSaved.id_socket,
-						id_socket_desk: null,
-						id_session: null,
-						id_company: ticketChildSaved.id_company,
-						id_skill: skillDB,
+						bl_priority: blPriority,
+						id_socket_client: ticketChildSaved.id_socket_client,
+						id_socket_waiter: null,
 						tm_start: ticketChildSaved.tm_start,
 						tm_att: null,
 						tm_end: null
@@ -279,9 +267,8 @@ function reassignTicket(req: Request, res: Response) {
 					});
 
 					// después de guardar el nuevo ticket, cierro el anterior
-					ticketParentDB.id_child = ticketChildSaved._id;
-					ticketParentDB.tm_end = + new Date().getTime();
-					ticketParentDB.save().catch(()=>{
+					ticketDB.tm_end = + new Date().getTime();
+					ticketDB.save().catch(() => {
 						return res.status(400).json({
 							ok: false,
 							msg: 'Error al cerrar el ticket anterior',
@@ -311,7 +298,7 @@ function reassignTicket(req: Request, res: Response) {
 		}).catch(() => {
 			return res.status(400).json({
 				ok: false,
-				msg: 'No se pudo obtener el skill solicitado',
+				msg: 'No se pudo obtener el session solicitado',
 				ticket: null
 			})
 		})
@@ -326,126 +313,142 @@ function reassignTicket(req: Request, res: Response) {
 function takeTicket(req: Request, res: Response) {
 
 	const server = Server.instance;
-	const { idSession, idSocketDesk } = req.body;
+	const { idTable, idSession, idSocketDesk } = req.body;
 
-	Session.findById(idSession).then(sessionDB => {
+	// SPM: SISTEMA DE PROVISIÓN DE MESAS
+	// 1. session: verifico que la sesión esté activa, sea válida y obtengo el sector tomado
+	// 2. table:  verifico que la mesa que se quiere tomar pertenezca al sector verifico la disponibilidad de la mesa ('idle') 
+	// 3. ticket: busco un ticket que posea la mesa como 'candidate' y se cambia el esatdo de 'assigned' a 'provided' con el timestamp correspondiente
+	// 4. table: se cambia el estado de 'idle' a 'busy' con su timestamp 
 
-		if (!sessionDB) {
-			return res.status(400).json({
-				ok: false,
-				msg: 'No existe la sesión del escritorio',
-				session: null
-			});
-		}
-		if (sessionDB.fc_end) {
-			return res.status(400).json({
-				ok: false,
-				msg: 'La sesión del escritorio ya finalizó',
-				session: null
-			});
-		}
+	// 1
+	Session.findById(idSession)
+		.populate('id_waiter id_section')
+		.then(sessionDB => { // obtengo el sector requerido
 
-		Desktop.findById(sessionDB?.id_desktop).then(desktopDB => {
-			if (!desktopDB) {
+			if (!sessionDB) {
 				return res.status(400).json({
 					ok: false,
-					msg: 'No existe el escritorio',
-					assistant: null
+					msg: 'No existe la sesión del escritorio',
+					session: null
 				});
 			}
 
-			User.findById(sessionDB.id_assistant).then(assistantDB => {
-				if (!assistantDB) {
-					return res.status(400).json({
-						ok: false,
-						msg: 'No existe el asistente',
-						assistant: null
-					});
-				}
+			if (sessionDB.fc_end) {
+				return res.status(400).json({
+					ok: false,
+					msg: 'La sesión del escritorio expiró',
+					session: null
+				});
+			}
 
-				if (assistantDB.id_company !== desktopDB.id_company) {
+			Section.findById(sessionDB.id_section).then(sectionDB => {
+
+				if(!sectionDB){
 					return res.status(400).json({
 						ok: false,
-						msg: 'El usuario y el escritorio no pertenecen a la misma empresa',
-						assistant: null
-					});
-				}
-				// Se obtuvo la sesión, el asistente y el escritorio
-				// Busco un nuevo ticket para atender
-				Ticket.findOne({
-					id_company: assistantDB.id_company,
-					id_skill: { $in: assistantDB.id_skills },
-					id_session: null,
-					tm_end: null
-				})
-					.populate('id_skill')
-					.populate({
-						path: 'id_session',
-						populate: { path: 'id_assistant id_desktop' }
+						msg: 'No existe el sector para la sesión solicitada',
+						ticket: null
 					})
-					.sort({ bl_priority: -1, tm_start: 1 }) // priority true first
-					// .limit(1)
-					.then(ticketDB => {
-						if (!ticketDB) {
-							return res.status(200).json({
-								ok: false,
-								msg: 'No existen tickets pendientes.',
-								ticket: null
-							})
-						}
+				}
 
-						ticketDB.tm_att = + new Date().getTime();
-						ticketDB.id_session = idSession;
-						ticketDB.id_socket_desk = idSocketDesk;
+				Table.findById(idTable)
+					.then(tableDB => {
 
-						ticketDB.save().then(ticketSaved => {
-
-							server.io.to(ticketSaved.id_socket).emit('message-private', { msg: `Usted fue llamado desde el escritorio ${desktopDB.cd_desktop} por ${assistantDB.tx_name} ` });
-							if (ticketSaved?.id_company) { server.io.to(ticketSaved.id_company).emit('update-public'); }
-
-							return res.status(200).json({
-								ok: true,
-								msg: 'Ticket obtenido correctamente',
-								ticket: ticketSaved
-							});
-
-						}).catch(() => {
+						// verifico que la mesa a liberar pertenezca al sector de la sesion
+						if (tableDB?.id_section !== sessionDB.id_section) {
 							return res.status(400).json({
 								ok: false,
-								msg: 'Se encontro un ticket pero sucedió un error al actualizarlo',
-								ticket: null
+								msg: 'La mesa que desea aprovisionar no existe en el sector indicado',
+								waiter: null
 							});
+						}
+
+						// verifico que la mesa este disponible ('idle')
+						if (tableDB.tx_status !== 'idle') {
+							return res.status(400).json({
+								ok: false,
+								msg: 'La mesa que desea aprovisionar no se encuentra disponible',
+								waiter: null
+							});
+						}
+
+						// 1. la sesión es válida 2. la mesa corresponde al sector de la sesión y está disponible
+						// 3. busco un ticket con la mesa indicada asignada por SAC como candidata 
+
+						Ticket.findOne({
+							id_company: sectionDB.id_company,
+							id_section: sessionDB.id_section, // session requested (sector requested),
+							nm_persons: tableDB.nm_persons,
+							id_session: null,
+							tm_provided: null
 						})
+							.sort({ tm_start: 1 }) // priority true first
+							// .limit(1)
+							.then(ticketDB => {
+
+								if (!ticketDB) {
+									return res.status(200).json({
+										ok: false,
+										msg: 'No existen tickets pendientes.',
+										ticket: null
+									})
+								}
+
+								ticketDB.tm_provided = + new Date().getTime();
+								ticketDB.id_session = idSession;
+								ticketDB.id_socket_waiter = idSocketDesk;
+
+								ticketDB.save().then(ticketSaved => {
+
+									server.io.to(ticketSaved.id_socket_client).emit('message-private', { msg: `Por favor pase por la mesa ${tableDB.nm_table}` });
+									if (ticketSaved?.id_company) { server.io.to(ticketSaved.id_company).emit('update-public'); }
+
+									return res.status(200).json({
+										ok: true,
+										msg: 'Ticket obtenido correctamente',
+										ticket: ticketSaved
+									});
+
+								}).catch(() => {
+									return res.status(400).json({
+										ok: false,
+										msg: 'Se encontro un ticket pero sucedió un error al actualizarlo',
+										ticket: null
+									});
+								})
+							}).catch(() => {
+								return res.status(500).json({
+									ok: false,
+									msg: 'Error al consultar el ticket',
+									ticket: null
+								})
+							})
+
 					}).catch(() => {
 						return res.status(500).json({
 							ok: false,
-							msg: 'Error al consultar el ticket',
-							ticket: null
+							msg: 'Error al consultar las mesas para el sector',
+							waiter: null
 						})
 					})
-			}).catch(() => {
-				return res.status(500).json({
-					ok: false,
-					msg: 'Error al consultar el asistente',
-					assistant: null
-				})
-			})
+			});
+
 		}).catch(() => {
 			return res.status(500).json({
 				ok: false,
-				msg: 'Error al consultar el escritorio',
-				assistant: null
+				msg: 'Error al consultar la session del camarero',
+				waiter: null
 			})
 		})
-	});
-};
+}
 
 function releaseTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 
 	Ticket.findByIdAndUpdate(idTicket, {
 		tm_att: null,
-		id_socket_desk: null,
+		id_socket_waiter: null,
 		id_session: null,
 		tm_end: null
 	}, { new: true }).then(ticketReleased => {
@@ -498,14 +501,14 @@ function getTickets(req: Request, res: Response) {
 	let day = + new Date().getDate();
 	let time = + new Date(year, month, day).getTime();
 
-	Ticket.find({ 
+	Ticket.find({
 		id_company: idCompany, // only this company
-		tm_start: {$gt: time}  // only from today
+		tm_start: { $gt: time }  // only from today
 	}).populate({
-			path: 'id_session',
-			populate: { path: 'id_assistant id_desktop' }
-		})
-		.populate('id_skill')
+		path: 'id_session',
+		populate: { path: 'id_waiter id_table' }
+	})
+		.populate('id_session')
 		.then((tickets) => {
 
 			if (tickets.length > 0) {
@@ -548,13 +551,13 @@ function updateSocket(req: Request, res: Response) {
 
 		let requestUpdateTo: string;
 		switch (oldSocket) {
-			case ticketDB.id_socket: // actualizo el socket del cliente
-				ticketDB.id_socket = newSocket;
-				if (ticketDB.id_socket_desk) { requestUpdateTo = ticketDB.id_socket_desk; }
+			case ticketDB.id_socket_client: // actualizo el socket del cliente
+				ticketDB.id_socket_client = newSocket;
+				if (ticketDB.id_socket_waiter) { requestUpdateTo = ticketDB.id_socket_waiter; }
 				break;
-			case ticketDB.id_socket_desk: // actualizo el socket del asistente
-				ticketDB.id_socket_desk = newSocket
-				requestUpdateTo = ticketDB.id_socket;
+			case ticketDB.id_socket_waiter: // actualizo el socket del camarero
+				ticketDB.id_socket_waiter = newSocket
+				requestUpdateTo = ticketDB.id_socket_client;
 				break;
 			default:
 				break;

@@ -5,41 +5,40 @@ import { Company } from '../models/company.model';
 import { Session } from '../models/session.model';
 
 // ========================================================
-// Assistant && Session Methods
+// Waiter && Session Methods
 // ========================================================
 
 // crud
-function createAssistant(req: Request, res: Response) {
+
+function createWaiter(req: Request, res: Response) {
 
     var body = req.body;
-
-    var assistant = new User({
+console.log(body)
+    var waiter = new User({
         tx_name: body.tx_name,
         tx_email: body.tx_email,
         tx_password: bcrypt.hashSync(body.tx_password, 10),
         id_company: body.id_company,
-        id_role: 'ASSISTANT_ROLE',
-        id_skills: body.id_skills,
-        tx_img: body.tx_img,
+        id_role: 'WAITER_ROLE',
         fc_createdat: new Date()
     });
 
-    assistant.save().then((assistantSaved: any) => {
+    waiter.save().then((waiterSaved: any) => {
         res.status(200).json({
             ok: true,
             msg: 'Usuario guardado correctamente',
-            user: assistantSaved
+            user: waiterSaved
         })
     }).catch((err) => {
         res.status(400).json({
             ok: false,
-            msg: 'El mail ya esta registrado',
+            msg: err,
             user: null
         });
     });
 }
 
-function readAssistants(req: Request, res: Response) {
+function readWaiters(req: Request, res: Response) {
     let idCompany = req.params.idCompany;
 
     User.find({ id_company: idCompany })
@@ -67,7 +66,7 @@ function readAssistants(req: Request, res: Response) {
 
 }
 
-function updateAssistant(req: Request, res: Response) {
+function updateWaiter(req: Request, res: Response) {
 
     var body = req.body;
 
@@ -76,13 +75,11 @@ function updateAssistant(req: Request, res: Response) {
         id_company: body.id_company,
         tx_name: body.tx_name,
         tx_email: body.tx_email,
-        id_skills: body.id_skills
     }
 
     if (body.tx_password !== '******') { user.tx_password = bcrypt.hashSync(body.tx_password, 10); }
 
     User.findByIdAndUpdate(body._id, user, { new: true })
-        .populate('id_skills')
         .populate('id_company')
         .then(userDB => {
             return res.status(200).json({
@@ -99,13 +96,13 @@ function updateAssistant(req: Request, res: Response) {
         })
 }
 
-function deleteAssistant(req: Request, res: Response) {
-    let idAssistant = req.params.idAssistant;
-    User.findByIdAndDelete(idAssistant).then((assistantDeleted) => {
+function deleteWaiter(req: Request, res: Response) {
+    let idWaiter = req.params.idWaiter;
+    User.findByIdAndDelete(idWaiter).then((waiterDeleted) => {
         res.status(200).json({
             ok: true,
             msg: 'Usuario eliminado correctamente',
-            user: assistantDeleted
+            user: waiterDeleted
         })
     }).catch(() => {
         res.status(400).json({
@@ -117,7 +114,8 @@ function deleteAssistant(req: Request, res: Response) {
 }
 
 // auxiliar
-function readAssistantsUser(req: Request, res: Response) {
+
+function readWaitersUser(req: Request, res: Response) {
     // obtiene todos los asistentes de todas las empresas de un usuario
 
     let idUser = req.params.idUser;
@@ -156,41 +154,11 @@ function readAssistantsUser(req: Request, res: Response) {
 
 }
 
-function readActiveSessionsBySkill(req: Request, res: Response) {
-    let idSkill = req.params.idSkill;
-    let today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
-    User.find({ id_skills: { $elemMatch: idSkill } }).then(companiesDB => {
-        return companiesDB.map(data => data._id) // solo quiero un array con los _id
-    }).then(idUsers => {
-        Session.find({fc_start: {$gt: today}, fc_end: null, id_assistant: {$in: idUsers}}).then(sessionsDB => {
-            return res.status(200).json({
-                ok: true,
-                msg: 'Sesiones obtenidas correctamente',
-                sessions: sessionsDB
-            })
-        }).catch(() => {
-            return res.status(400).json({
-                ok: false,
-                msg: 'Error al consultar las sesiones activas para los usuarios con el skill indicado',
-                sessions: null
-            })
-        })
-    }).catch(() => {
-        return res.status(400).json({
-            ok: false,
-            msg: 'Error al consultar los usuarios con el skill indicado',
-            sessions: null
-        })
-    })
-
-
-}
 
 export = {
-    createAssistant,
-    readAssistants,
-    readAssistantsUser,
-    readActiveSessionsBySkill,
-    updateAssistant,
-    deleteAssistant,
+    createWaiter,
+    readWaiters,
+    readWaitersUser,
+    updateWaiter,
+    deleteWaiter,
 }

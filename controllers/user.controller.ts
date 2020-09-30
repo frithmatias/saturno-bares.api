@@ -27,7 +27,7 @@ function createUser(req: any, res: Response) {
     bl_google: false,
     fc_lastlogin: null,
     fc_createdat: new Date(),
-    tx_role: 'ADMIN_ROLE',
+    id_role: 'ADMIN_ROLE',
   });
 
   user.save().then((userSaved) => {
@@ -58,7 +58,6 @@ function attachCompany(req: Request, res: Response) {
 
   User.findByIdAndUpdate(idUser, { 'id_company': company._id }, { new: true })
     .populate('id_company')
-    .populate('id_skills')
     .then(userUpdated => {
 
       return res.status(200).json({
@@ -132,7 +131,6 @@ async function loginGoogle(req: Request, res: Response) {
 
       User.findOne({ tx_email: googleUser.email })
         .populate('id_company')
-        .populate('id_skills')
         .then(userDB => {
 
           if (userDB) {  // el user existe, intenta loguearse
@@ -154,10 +152,10 @@ async function loginGoogle(req: Request, res: Response) {
                 .then(async userSaved => {
 
                   userSaved.tx_password = ":)";
-                  await obtenerMenu(userDB.tx_role, userDB.cd_pricing).then(menu => {
+                  await obtenerMenu(userDB.id_role, userDB.cd_pricing).then(menu => {
 
                     let home;
-                    switch (userDB.tx_role) {
+                    switch (userDB.id_role) {
                       case 'ADMIN_ROLE':
                         home = '/admin/home';
                         break;
@@ -213,13 +211,13 @@ async function loginGoogle(req: Request, res: Response) {
             user.bl_google = true;
             user.fc_lastlogin = new Date();
             user.fc_createdat = new Date();
-            user.tx_role = 'ADMIN_ROLE';
+            user.id_role = 'ADMIN_ROLE';
             user.cd_pricing = 0;
 
             user.save().then(async userSaved => {
 
               var token = Token.getJwtToken({ user });
-              await obtenerMenu(user.tx_role, user.cd_pricing).then(menu => {
+              await obtenerMenu(user.id_role, user.cd_pricing).then(menu => {
 
                 res.status(200).json({
                   ok: true,
@@ -275,7 +273,6 @@ function loginUser(req: Request, res: Response) {
   var body = req.body;
   User.findOne({ tx_email: body.tx_email })
     .populate('id_company')
-    .populate({ path: 'id_skills', select: 'cd_skill tx_skill' })
     .then(userDB => {
 
       if (!userDB) {
@@ -301,9 +298,9 @@ function loginUser(req: Request, res: Response) {
         userDB.tx_password = ":)";
 
         let home;
-        switch (userDB.tx_role) {
-          case 'ASSISTANT_ROLE':
-            home = '/assistant/home';
+        switch (userDB.id_role) {
+          case 'WAITER_ROLE':
+            home = '/waiter/home';
             break;
           case 'ADMIN_ROLE':
             home = '/admin/home';
@@ -312,7 +309,7 @@ function loginUser(req: Request, res: Response) {
             home = '/superuser/home';
             break;
           default:
-            home = '/assistant/role';
+            home = '/waiter/role';
         };
 
         res.status(200).json({
@@ -322,7 +319,7 @@ function loginUser(req: Request, res: Response) {
           body: body,
           id: userDB._id,
           user: userDB,
-          menu: await obtenerMenu(userDB.tx_role, userDB.cd_pricing),
+          menu: await obtenerMenu(userDB.id_role, userDB.cd_pricing),
           home
         });
 
@@ -351,11 +348,11 @@ function obtenerMenu(txRole: string, cdPricing: number = 0) {
   return new Promise((resolve, reject) => {
     var cdRole: number[] = [];
     switch (txRole) {
-      case 'ASSISTANT_ROLE':
-        cdRole = [0]; // assistant
+      case 'WAITER_ROLE':
+        cdRole = [0]; // waiter
         break;
       case 'ADMIN_ROLE':
-        cdRole = [0, 1]; // assistant && admin
+        cdRole = [0, 1]; // waiter && admin
         break;
       case 'SUPERUSER_ROLE':
         cdRole = [2]; // superuser

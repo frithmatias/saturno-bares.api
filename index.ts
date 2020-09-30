@@ -9,15 +9,18 @@ import mongoose from 'mongoose';
 // ROUTES
 import publicRoutes from './routes/public.routes';
 import ticketRoutes from './routes/ticket.routes';
-import companyRoutes from './routes/company.routes';
+
+import superuserRoutes from './routes/superuser.routes';
 import userRoutes from './routes/user.routes';
-import skillRoutes from './routes/skill.routes';
-import desktopRoutes from './routes/desktop.routes';
-import assistantRoutes from './routes/assistant.routes';
+
+import companyRoutes from './routes/company.routes';
+import sectionRoutes from './routes/section.routes';
+import waiterRoutes from './routes/waiter.routes';
+import tableRoutes from './routes/table.routes';
+
 import notificationRoutes from './routes/notification.routes';
 import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
-import superuserRoutes from './routes/superuser.routes';
 
 
 
@@ -53,15 +56,18 @@ server.app.use(cors({ origin: true, credentials: true })); // permito que cualqu
 // RUTAS
 server.app.use('/t', ticketRoutes);
 server.app.use('/p', publicRoutes);
-server.app.use('/c', companyRoutes);
+
+server.app.use('/superuser', superuserRoutes);
 server.app.use('/u', userRoutes);
-server.app.use('/s', skillRoutes);
-server.app.use('/d', desktopRoutes);
-server.app.use('/a', assistantRoutes);
+
+server.app.use('/c', companyRoutes);
+server.app.use('/section', sectionRoutes);
+server.app.use('/w', waiterRoutes);
+server.app.use('/table', tableRoutes);
+
 server.app.use('/n', notificationRoutes);
-server.app.use('/m', metricRoutes);
+server.app.use('/metrics', metricRoutes);
 server.app.use('/i', indicatorRoutes);
-server.app.use('/su', superuserRoutes);
 
 
 server.start(() => {

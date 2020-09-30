@@ -11,11 +11,6 @@ webpush.setVapidDetails(
     keys.privateKey
   );
 
-
-// ========================================================
-// Skill Methods
-// ========================================================
-
 function notificationSubscribe(req: Request, res: Response) {
     
 

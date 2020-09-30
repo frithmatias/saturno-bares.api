@@ -13,20 +13,20 @@ self.addEventListener('install', e => {
       return cache.addAll([
         '/',
         '/index.html',
-        '/5.30ef5700eb9315517807.js',
-        '/6.f04588cfcd242575b763.js',
-        '/7.e2cbd93621b2cd0abde4.js',
-        '/8.52864573110add4b539e.js',
-        '/9.4b45bd400678b96b4d3b.js',
-        '/bghome.684c3a5ab69f9176b812.jpg',
-        '/bgtile1.24387b8acb702323a6b6.png',
-        '/bgtile2.916b8a1f682edacc68a2.png',
-        '/bgtile3.0df35a810f9f086285c1.png',
-        '/common.14facb5e31e9f97fc6b0.js',
-        '/main.d074dd8155d77362104d.js',
-        '/polyfills.5aab4676029f8f7a1213.js',
-        '/runtime.0770ad27d87a5d4c4096.js',
-        '/styles.52a58422e0ab5e258e7f.css'
+        '/55.8cb65e073d47da8fe9e8.js',
+        '/66.1d9750f3cab9ef3b3797.js',
+        '/77.e2cbd93621b2cd0abde4.js',
+        '/88.31e8b685d97edeca80b0.js',
+        '/99.4b45bd400678b96b4d3b.js',
+        '/bbghome.2374cce18f9d245fa1a9.jpg',
+        '/bbgtile1.24387b8acb702323a6b6.png',
+        '/bbgtile2.916b8a1f682edacc68a2.png',
+        '/bbgtile3.0df35a810f9f086285c1.png',
+        '/ccommon.14facb5e31e9f97fc6b0.js',
+        '/mmain.240eb9cfc42c6012eb69.js',
+        '/ppolyfills.5aab4676029f8f7a1213.js',
+        '/rruntime.10644e8ba603d43616ed.js',
+        '/sstyles.52a58422e0ab5e258e7f.css'
       ])
     })
     .catch(() => {
@@ -169,9 +169,9 @@ self.addEventListener('push', e => {
     ],
     icon: 'assets/img/icons/icon-72x72.png',
     badge: 'img/favicon.ico',
-    openUrl: 'https://saturno.love',
+    openUrl: 'https://saturno.fun',
     data: {
-      url: 'https://saturno.love'
+      url: 'https://saturno.fun'
     },
     actions: [
       // solo permite dos acciones válidas se muestran como BOTONES en la notificación.
