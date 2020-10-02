@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Ticket } from '../models/ticket.model';
-import { Session } from '../models/session.model';
+import { sectionSession } from '../models/section.session.model';
 import moment from 'moment';
 import { Score } from '../models/score.model';
 
@@ -13,7 +13,7 @@ function getUserMetrics(req: Request, res: Response) {
     let idUser = req.body.idUser;
     let fcSel = req.body.fcSel;
     let fcSelAdd24 = fcSel + 3600 * 24 * 1000;
-    Session.find({ id_waiter: idUser }).then(sessionsDB => {
+    sectionSession.find({ id_waiter: idUser }).then(sessionsDB => {
         // sessions array to get tickets
         let sessions = sessionsDB.map(session => String(session._id));
 

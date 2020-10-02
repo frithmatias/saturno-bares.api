@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Section } from '../models/section.model';
-import { Session } from '../models/session.model';
+import { sectionSession } from '../models/section.session.model';
 import { Company } from '../models/company.model';
 
 // ========================================================
@@ -122,7 +122,7 @@ function takeSection(req: Request, res: Response) {
     let idWaiter = req.body.idWaiter;
     console.log(req.body)
     // actualizo el estado del escritorio
-    var session = new Session({
+    var session = new sectionSession({
         id_section: idSection,
         id_waiter: idWaiter,
         fc_start: + new Date().getTime(),
@@ -181,7 +181,7 @@ function releaseSection(req: Request, res: Response) {
             })
         }
 
-        Session.findByIdAndUpdate(tableUpdated.id_session,
+        sectionSession.findByIdAndUpdate(tableUpdated.id_session,
             { fc_end: + new Date().getTime() }).then(tableReleased => {
 
                 return res.status(200).json({

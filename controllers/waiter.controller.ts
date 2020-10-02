@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { User } from '../models/user.model';
 import bcrypt from 'bcrypt';
 import { Company } from '../models/company.model';
-import { Session } from '../models/session.model';
+import { sectionSession } from '../models/section.session.model';
 
 // ========================================================
 // Waiter && Session Methods
@@ -13,7 +13,6 @@ import { Session } from '../models/session.model';
 function createWaiter(req: Request, res: Response) {
 
     var body = req.body;
-console.log(body)
     var waiter = new User({
         tx_name: body.tx_name,
         tx_email: body.tx_email,

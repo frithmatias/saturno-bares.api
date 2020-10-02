@@ -11,7 +11,7 @@ const sectionRoutes = Router();
 
 sectionRoutes.post('/createsection', mdAuth.verificaToken, SectionController.createSection);
 sectionRoutes.get('/readsectionsuser/:idUser', mdAuth.verificaToken, SectionController.readSectionsUser);
-sectionRoutes.get('/readsections/:idCompany', mdAuth.verificaToken, SectionController.readSections);
+sectionRoutes.get('/readsections/:idCompany', SectionController.readSections);
 
 sectionRoutes.delete('/deletesection/:idSection', mdAuth.verificaToken, SectionController.deleteSection);
 sectionRoutes.post('/takesection', mdAuth.verificaToken, SectionController.takeSection);

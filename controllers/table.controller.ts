@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import { Table } from '../models/table.model';
-import { Session } from '../models/session.model';
 import { Company } from '../models/company.model';
 import { Section } from '../models/section.model';
 

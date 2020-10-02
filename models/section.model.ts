@@ -7,8 +7,8 @@ const sectionSchema = new Schema({
 },{ collection: "sections" })
 
 export interface Section extends Document { 
-    id_company?: string;
-    tx_section?: string;
+    id_company: string;
+    tx_section: string;
     id_session?: string | null; 
 }
 export const Section = model<Section>('Section', sectionSchema);

@@ -4,155 +4,12 @@ import Server from '../classes/server';
 // MODELS
 import { Ticket } from '../models/ticket.model';
 import { Position } from '../models/position.model';
-import { User } from '../models/user.model';
 import { Table } from '../models/table.model';
-import { Session } from '../models/session.model';
+import { sectionSession } from '../models/section.session.model';
 import { Section } from '../models/section.model';
+import { TableSession } from '../models/table.session.model';
 
 const server = Server.instance; // singleton
-
-
-// ========================================================
-// user methods
-// ========================================================
-
-function createTicket(req: Request, res: Response) {
-
-	const { idCompany, idSession, idSocket, blPriority } = req.body;
-
-	const idDay = + new Date().getDate();
-	const idMonth = + new Date().getMonth() + 1;
-	const idYear = + new Date().getFullYear();
-
-	let idPosition: number;
-
-	Session.findById(idSession).then(sessionDB => {
-
-		if (!sessionDB) {
-			return res.status(400).json({
-				ok: false,
-				msg: 'No existe la session de mesa solicitada',
-				ticket: null
-			})
-		}
-
-		// busco la posición que le corresponde
-		Position.findOneAndUpdate({
-			id_session: idSession,
-			id_year: idYear,
-			id_month: idMonth,
-			id_day: idDay
-		}, { $inc: { id_position: 1 } }, { new: true }).then((sessionNextNumber) => {
-
-			// si no existe el primer turno lo crea
-			if (!sessionNextNumber) {
-
-				let newSessionNumber = new Position({
-					id_session: idSession,
-					id_year: idYear,
-					id_month: idMonth,
-					id_day: idDay,
-					id_position: 1
-				})
-
-				newSessionNumber.save()
-					.catch(() => {
-						return res.status(400).json({
-							ok: false,
-							msg: "El nuevo status no se pudo guardar."
-						});
-					})
-
-				idPosition = newSessionNumber.id_position;
-			}
-
-			if (sessionNextNumber) {
-				idPosition = sessionNextNumber.id_position;
-			}
-
-			// guardo el ticket
-			let ticket = new Ticket({
-				id_session: idSession,
-				id_position: idPosition,
-				bl_priority: blPriority,
-				id_socket_client: idSocket,
-				id_socket_waiter: null,
-				tm_start: + new Date().getTime(),
-				tm_att: null,
-				tm_end: null
-			})
-
-			ticket.save().then((ticketSaved) => {
-
-				const server = Server.instance;
-				// welcome message to client
-				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
-				// advice to dekstops in company
-				server.io.to(idCompany).emit('update-tables');
-
-				res.status(201).json({
-					ok: true,
-					msg: "Ticket guardado correctamente.",
-					ticket: ticketSaved
-				});
-
-			}).catch(() => {
-
-				return res.status(400).json({
-					ok: false,
-					msg: 'Error al guardar el ticket',
-					ticket: false
-				});
-
-			})
-		}).catch(() => {
-
-			return res.status(400).json({
-				ok: false,
-				msg: "Error al procesar el status de los tickets para la empresa."
-			});
-
-		})
-
-
-	}).catch(() => {
-		return res.status(400).json({
-			ok: false,
-			msg: 'No se pudo obtener el session solicitado',
-			ticket: null
-		})
-	})
-
-};
-
-function cancelTicket(req: Request, res: Response) {
-	const idTicket = req.params.idTicket;
-
-	Ticket.findByIdAndUpdate(idTicket, { tm_end: + new Date().getTime() }).then((ticketCanceled) => {
-		if (ticketCanceled) {
-
-			if (ticketCanceled.id_socket_waiter) {
-				// cancel dekstop session and update tickets on waiter table 
-				server.io.to(ticketCanceled.id_socket_waiter).emit('ticket-cancelled', ticketCanceled._id);
-			} else {
-				// update tickets on tables
-				server.io.to(ticketCanceled.id_company).emit('update-tables');
-			}
-
-			return res.status(200).json({
-				ok: true,
-				msg: "Ticket finalizado correctamente",
-				ticket: ticketCanceled
-			})
-		}
-	}).catch(() => {
-		return res.status(400).json({
-			ok: false,
-			msg: "No se pudo finalizar el ticket",
-			ticket: null
-		})
-	})
-}
 
 // ========================================================
 // waiter methods
@@ -179,7 +36,7 @@ function reassignTicket(req: Request, res: Response) {
 			})
 		}
 
-		Session.findById(idSession).then((sessionDB) => {
+		sectionSession.findById(idSession).then((sessionDB) => {
 
 			if (!sessionDB) {
 				return res.status(400).json({
@@ -247,7 +104,7 @@ function reassignTicket(req: Request, res: Response) {
 					const server = Server.instance;
 
 					server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
-					server.io.to(idCompany).emit('update-public');
+					server.io.to(idCompany).emit('update-clients');
 
 					let ticketToUser = {
 						id_session: idSession,
@@ -322,7 +179,7 @@ function takeTicket(req: Request, res: Response) {
 	// 4. table: se cambia el estado de 'idle' a 'busy' con su timestamp 
 
 	// 1
-	Session.findById(idSession)
+	sectionSession.findById(idSession)
 		.populate('id_waiter id_section')
 		.then(sessionDB => { // obtengo el sector requerido
 
@@ -344,7 +201,7 @@ function takeTicket(req: Request, res: Response) {
 
 			Section.findById(sessionDB.id_section).then(sectionDB => {
 
-				if(!sectionDB){
+				if (!sectionDB) {
 					return res.status(400).json({
 						ok: false,
 						msg: 'No existe el sector para la sesión solicitada',
@@ -402,7 +259,7 @@ function takeTicket(req: Request, res: Response) {
 								ticketDB.save().then(ticketSaved => {
 
 									server.io.to(ticketSaved.id_socket_client).emit('message-private', { msg: `Por favor pase por la mesa ${tableDB.nm_table}` });
-									if (ticketSaved?.id_company) { server.io.to(ticketSaved.id_company).emit('update-public'); }
+									if (ticketSaved?.id_company) { server.io.to(ticketSaved.id_company).emit('update-clients'); }
 
 									return res.status(200).json({
 										ok: true,
@@ -452,7 +309,7 @@ function releaseTicket(req: Request, res: Response) {
 		id_session: null,
 		tm_end: null
 	}, { new: true }).then(ticketReleased => {
-		if (ticketReleased?.id_company) { server.io.to(ticketReleased.id_company).emit('update-public'); }
+		if (ticketReleased?.id_company) { server.io.to(ticketReleased.id_company).emit('update-clients'); }
 		return res.status(200).json({
 			ok: true,
 			msg: 'Ticket soltado correctamente',
@@ -472,7 +329,7 @@ function endTicket(req: Request, res: Response) {
 	Ticket.findByIdAndUpdate(idTicket, { tm_end: + new Date().getTime() }).then(ticketEnded => {
 
 		if (ticketEnded?.id_company) {
-			server.io.to(ticketEnded.id_company).emit('update-public'); // clients
+			server.io.to(ticketEnded.id_company).emit('update-clients'); // clients
 		}
 
 		return res.status(200).json({
@@ -492,6 +349,121 @@ function endTicket(req: Request, res: Response) {
 // ========================================================
 // public methods
 // ========================================================
+
+function createTicket(req: Request, res: Response) {
+
+	const { idSocket, blPriority, nmPersons, idSection } = req.body;
+
+	const idDay = + new Date().getDate();
+	const idMonth = + new Date().getMonth() + 1;
+	const idYear = + new Date().getFullYear();
+
+	let idPosition: number;
+
+	Section.findById(idSection).then(sectionDB => {
+
+		if (!sectionDB) {
+			return res.status(400).json({
+				ok: false,
+				msg: 'No existe el sector solicitado',
+				ticket: null
+			})
+		}
+
+		// busco la posición que le corresponde
+		Position.findOneAndUpdate({
+			id_section: idSection,
+			id_year: idYear,
+			id_month: idMonth,
+			id_day: idDay
+		}, { $inc: { id_position: 1 } }, { new: true }).then((sectionNextNumber) => {
+
+			// si no existe el primer turno lo crea
+			if (!sectionNextNumber) {
+
+				let newSectionNumber = new Position({
+					id_section: idSection,
+					id_year: idYear,
+					id_month: idMonth,
+					id_day: idDay,
+					id_position: 1
+				})
+
+				newSectionNumber.save()
+					.catch(() => {
+						return res.status(400).json({
+							ok: false,
+							msg: "El nuevo status no se pudo guardar."
+						});
+					})
+
+				idPosition = newSectionNumber.id_position;
+			}
+
+			if (sectionNextNumber) {
+				idPosition = sectionNextNumber.id_position;
+			}
+
+			// guardo el ticket
+			let ticket = new Ticket({
+				id_company: sectionDB.id_company,
+				id_section: idSection,
+				nm_persons: nmPersons,
+				id_position: idPosition,
+				bl_priority: blPriority,
+				id_socket_client: idSocket,
+				id_socket_waiter: null,
+				tm_start: + new Date().getTime(),
+				tm_att: null,
+				tm_end: null
+			})
+
+			ticket.save().then((ticketSaved) => {
+
+
+   				// SPM: Sistema de Provisión de mesas
+				spm(ticket);
+
+				const server = Server.instance;
+				// welcome message to client
+				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
+				// advice to dekstops in company
+				server.io.to(sectionDB.id_company).emit('update-waiters');
+
+				res.status(201).json({
+					ok: true,
+					msg: "Ticket guardado correctamente.",
+					ticket: ticketSaved
+				});
+
+			}).catch((err) => {
+
+				return res.status(400).json({
+					ok: false,
+					msg: err,
+					ticket: false
+				});
+
+			})
+		}).catch(() => {
+
+			return res.status(400).json({
+				ok: false,
+				msg: "Error al procesar el status de los tickets para la empresa."
+			});
+
+		})
+
+
+	}).catch(() => {
+		return res.status(400).json({
+			ok: false,
+			msg: 'No se pudo obtener el session solicitado',
+			ticket: null
+		})
+	})
+
+};
 
 function getTickets(req: Request, res: Response) {
 	const idCompany = req.params.id_company;
@@ -601,6 +573,90 @@ function updateSocket(req: Request, res: Response) {
 
 	})
 }
+
+function cancelTicket(req: Request, res: Response) {
+	const idTicket = req.params.idTicket;
+
+	Ticket.findByIdAndUpdate(idTicket, { tm_end: + new Date().getTime() }).then((ticketCanceled) => {
+		if (ticketCanceled) {
+
+			if (ticketCanceled.id_socket_waiter) {
+				// cancel dekstop session and update tickets on waiter table 
+				server.io.to(ticketCanceled.id_socket_waiter).emit('ticket-cancelled', ticketCanceled._id);
+			} else {
+				// update tickets on tables
+				server.io.to(ticketCanceled.id_company).emit('update-waiters');
+			}
+
+			return res.status(200).json({
+				ok: true,
+				msg: "Ticket finalizado correctamente",
+				ticket: ticketCanceled
+			})
+		}
+	}).catch(() => {
+		return res.status(400).json({
+			ok: false,
+			msg: "No se pudo finalizar el ticket",
+			ticket: null
+		})
+	})
+}
+
+// auxiliar methods
+// sistema de provisión de mesas
+let spm = (ticket: Ticket) => {
+	console.log(ticket)
+	/*
+	1. verifico que exista al menos una mesa para la cantidad solicitada, si no existe el status pasa de 'queue' a 'requested'
+	2. si existe y el status es 'idle' el estado pasa de queue a 'assigned', si es busy el estado persiste en 'queue' 
+	
+	*/
+	// buscar una mesa para 'ticket'
+	Table.find({nm_persons: { $gte: ticket.nm_persons}, id_section: ticket.id_section}).then(tablesDB => {
+		console.log('MESAS ')
+		// no existe, 'queue' -> 'requested'
+		if(tablesDB.length === 0){
+			Ticket.findByIdAndUpdate(ticket._id, {tx_status: 'requested'});
+		}
+
+		// existe, disponible 'queue' -> 'assigned'
+		let idleTables = tablesDB.filter(table => table.tx_status === 'idle');
+
+		if(idleTables.length > 0){
+
+			let session = new TableSession();
+			let idTable = idleTables[0]._id;
+			let idTicket = ticket._id;
+			let fcStart = + new Date();
+			session.id_table = idTable;
+			session.id_ticket = idTicket;
+			session.fc_start = fcStart;
+			session.save().then(sessionSaved => {
+
+				let idSession = sessionSaved._id;
+				// update table
+				Table.findByIdAndUpdate(idTable, {
+					tx_status: 'busy',
+					id_session: idSession
+				})
+				
+				// update ticket
+				Ticket.findByIdAndUpdate(ticket._id, {
+					tx_status: 'assigned', 
+					tm_provided: + new Date(),
+					id_session: idSession
+				})
+			})
+
+			
+		}
+		// existe, no disponible 
+		// do nothing
+	
+	})
+}
+
 
 export = {
 	createTicket,
