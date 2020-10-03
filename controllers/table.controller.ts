@@ -1,23 +1,22 @@
 import { Request, Response } from 'express';
 import { Table } from '../models/table.model';
-import { Company } from '../models/company.model';
 import { Section } from '../models/section.model';
 
 // ========================================================
 // Table Methods
 // ========================================================
 
-function createTable(req: Request, res: Response) {
+let createTable = (req: Request, res: Response) => {
 
     var { id_section, nm_table, nm_persons } = req.body;
-    console.log(req.body)
     var table = new Table({
         id_section,
         nm_table,
-        nm_persons
+        nm_persons,
+        bl_status: false,
+        tx_satus: 'paused',
+        id_session: null
     });
-    console.log(table)
-
     table.save().then((tableSaved) => {
         res.status(200).json({
             ok: true,
@@ -33,42 +32,7 @@ function createTable(req: Request, res: Response) {
     })
 }
 
-function readTablesUser(req: Request, res: Response) {
-    let idUser = req.params.idUser;
-
-    Company.find({ id_user: idUser }).then(companiesDB => {
-        return companiesDB.map(company => company._id)
-    }).then(resp => {
-        Table.find({ id_company: { $in: resp } }).populate('id_company').then(tablesDB => {
-            if (!tablesDB) {
-                return res.status(400).json({
-                    ok: false,
-                    msg: 'No existen escritorios para la empresa seleccionada',
-                    tables: null
-                })
-            }
-            return res.status(200).json({
-                ok: true,
-                msg: 'Mesas obtenidos correctamente',
-                tables: tablesDB
-            })
-        }).catch(() => {
-            return res.status(500).json({
-                ok: false,
-                msg: 'Error al consultar los escritorios para las empresas del user',
-                tables: null
-            })
-        }).catch(() => {
-            return res.status(500).json({
-                ok: false,
-                msg: 'Error al consultar las empresas del user',
-                tables: null
-            })
-        })
-    })
-}
-
-function readTables(req: Request, res: Response) {
+let readTables = (req: Request, res: Response) => {
     let idCompany = req.params.idCompany;
 
     Section.find({ id_company: idCompany }).then(sectionsDB => {
@@ -120,9 +84,8 @@ function readTables(req: Request, res: Response) {
     })
 }
 
-function readSectionTables(req: Request, res: Response) {
+let readSectionTables = (req: Request, res: Response) => {
     let idSection = req.params.idSection;
-    console.log(idSection)
     Section.findById(idSection).then(sectionDB => {
 
         if (!sectionDB) {
@@ -169,7 +132,40 @@ function readSectionTables(req: Request, res: Response) {
     })
 }
 
-function deleteTable(req: Request, res: Response) {
+let toggleTableStatus = (req: Request, res: Response) => {
+    let idTable = req.params.idTable;
+
+
+    Table.findById(idTable).then(tableDB => {
+        
+        if(!tableDB){
+            res.status(400).json({
+                ok: false,
+                msg: 'No existe la mesa',
+                table: null
+            })
+        } else {
+            tableDB.tx_status = tableDB?.tx_status==='idle' ? 'paused' : 'idle';
+            tableDB.save().then(statusSaved => {
+                res.status(200).json({
+                    ok: true,
+                    msg: 'El nuevo estado de mesa fue guardado',
+                    table: statusSaved
+                })
+            }).catch(() => {
+                res.status(500).json({
+                    ok: false, 
+                    msg: 'No se pudo guardar el nuevo estado de mesa',
+                    table: null
+                })
+            })
+        }
+
+        
+    })
+}
+
+let deleteTable = (req: Request, res: Response) => {
     let idTable = req.params.idTable;
     Table.findByIdAndDelete(idTable).then((tableDeleted) => {
         res.status(200).json({
@@ -189,8 +185,8 @@ function deleteTable(req: Request, res: Response) {
 
 export = {
     createTable,
-    readTablesUser,
     readTables,
     readSectionTables,
+    toggleTableStatus,
     deleteTable
 }

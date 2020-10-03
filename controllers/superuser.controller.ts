@@ -17,7 +17,6 @@ function createMenu(req: Request, res: Response) {
         tx_icon: body.tx_icon,
         tx_url: body.tx_url,
     });
-    console.log(menu)
     menu.save().then((menuSaved: any) => {
         res.status(200).json({
             ok: true,
@@ -59,7 +58,6 @@ function readMenu(req: Request, res: Response) {
 function updateMenu(req: Request, res: Response) {
 
     var body = req.body;
-    console.log(req.body)
     let menu: any = {
         id_parent: body.id_parent,
         cd_pricing: body.cd_pricing,

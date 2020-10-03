@@ -466,8 +466,8 @@ function createTicket(req: Request, res: Response) {
 };
 
 function getTickets(req: Request, res: Response) {
-	const idCompany = req.params.id_company;
-
+	const idCompany = req.params.idCompany;
+	console.log(idCompany)
 	let year = + new Date().getFullYear();
 	let month = + new Date().getMonth();
 	let day = + new Date().getDate();
@@ -476,11 +476,8 @@ function getTickets(req: Request, res: Response) {
 	Ticket.find({
 		id_company: idCompany, // only this company
 		tm_start: { $gt: time }  // only from today
-	}).populate({
-		path: 'id_session',
-		populate: { path: 'id_waiter id_table' }
 	})
-		.populate('id_session')
+	
 		.then((tickets) => {
 
 			if (tickets.length > 0) {
@@ -500,7 +497,7 @@ function getTickets(req: Request, res: Response) {
 		}).catch((err) => {
 			return res.status(500).json({
 				ok: false,
-				msg: "Error al obtener los tickets para la empresa solicitada.",
+				msg: err,
 				tickets: null
 			});
 		})
@@ -606,15 +603,14 @@ function cancelTicket(req: Request, res: Response) {
 // auxiliar methods
 // sistema de provisión de mesas
 let spm = (ticket: Ticket) => {
-	console.log(ticket)
+	
 	/*
 	1. verifico que exista al menos una mesa para la cantidad solicitada, si no existe el status pasa de 'queue' a 'requested'
 	2. si existe y el status es 'idle' el estado pasa de queue a 'assigned', si es busy el estado persiste en 'queue' 
-	
 	*/
+
 	// buscar una mesa para 'ticket'
 	Table.find({nm_persons: { $gte: ticket.nm_persons}, id_section: ticket.id_section}).then(tablesDB => {
-		console.log('MESAS ')
 		// no existe, 'queue' -> 'requested'
 		if(tablesDB.length === 0){
 			Ticket.findByIdAndUpdate(ticket._id, {tx_status: 'requested'});

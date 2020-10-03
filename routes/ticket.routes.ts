@@ -13,7 +13,7 @@ const ticketRoutes = Router();
 ticketRoutes.post('/createticket', ticketController.createTicket);
 ticketRoutes.get('/cancelticket/:idTicket', ticketController.cancelTicket);
 
-ticketRoutes.get('/gettickets/:id_company', ticketController.getTickets);
+ticketRoutes.get('/gettickets/:idCompany', ticketController.getTickets);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
 
 // desktop requests

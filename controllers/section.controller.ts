@@ -120,7 +120,6 @@ function takeSection(req: Request, res: Response) {
 
     let idSection = req.body.idSection;
     let idWaiter = req.body.idWaiter;
-    console.log(req.body)
     // actualizo el estado del escritorio
     var session = new sectionSession({
         id_section: idSection,

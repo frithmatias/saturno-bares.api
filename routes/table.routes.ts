@@ -10,9 +10,9 @@ import TableController from '../controllers/table.controller';
 const tableRoutes = Router();
 
 tableRoutes.post('/createtable', mdAuth.verificaToken, TableController.createTable);
-tableRoutes.get('/readtablesuser/:idUser', mdAuth.verificaToken, TableController.readTablesUser);
 tableRoutes.get('/readtables/:idCompany', mdAuth.verificaToken, TableController.readTables);
 tableRoutes.get('/readsectiontables/:idSection', mdAuth.verificaToken, TableController.readSectionTables);
+tableRoutes.get('/toggletablestatus/:idTable', mdAuth.verificaToken, TableController.toggleTableStatus);
 tableRoutes.delete('/deletetable/:idTable', mdAuth.verificaToken, TableController.deleteTable);
 
 export default tableRoutes;
