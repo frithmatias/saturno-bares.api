@@ -16,8 +16,8 @@ const userSchema = new Schema({
     cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
     tx_img: {type: String, required: false},
     bl_google: {type: Boolean, required: true, default: false},
-    fc_lastlogin: { type: Date, required: false },
-    fc_createdat: { type: Date, required: false }
+    tm_lastlogin: { type: Date, required: false },
+    tm_createdat: { type: Date, required: false }
 },{ collection: "users" })
 
 userSchema.method('checkPassword', function(this: any, pass: String = ''): boolean {
@@ -50,8 +50,8 @@ interface User extends Document {
     cd_pricing: number;
     tx_img: string;
     bl_google: boolean;
-    fc_lastlogin: Date | null;
-    fc_createdat: Date;
+    tm_lastlogin: Date | null;
+    tm_createdat: Date;
     getData: () => {};
 }
 

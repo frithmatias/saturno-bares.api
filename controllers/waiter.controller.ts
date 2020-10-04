@@ -19,7 +19,7 @@ function createWaiter(req: Request, res: Response) {
         tx_password: bcrypt.hashSync(body.tx_password, 10),
         id_company: body.id_company,
         id_role: 'WAITER_ROLE',
-        fc_createdat: new Date()
+        tm_createdat: new Date()
     });
 
     waiter.save().then((waiterSaved: any) => {

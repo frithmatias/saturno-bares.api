@@ -17,8 +17,8 @@ function createCompany(req: Request, res: Response) {
     tx_address_street: body.company.tx_address_street,
     tx_address_number: body.company.tx_address_number,
     cd_city: body.company.cd_city,
-    fc_att_start: null,
-    fc_att_end: null
+    tm_start: null,
+    tm_end: null
   });
 
   company.save().then((companySaved) => {

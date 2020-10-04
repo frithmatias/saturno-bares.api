@@ -124,8 +124,8 @@ function takeSection(req: Request, res: Response) {
     var session = new sectionSession({
         id_section: idSection,
         id_waiter: idWaiter,
-        fc_start: + new Date().getTime(),
-        fc_end: null
+        tm_start: + new Date().getTime(),
+        tm_end: null
     });
 
     session.save().then(sessionSaved => {
@@ -181,7 +181,7 @@ function releaseSection(req: Request, res: Response) {
         }
 
         sectionSession.findByIdAndUpdate(tableUpdated.id_session,
-            { fc_end: + new Date().getTime() }).then(tableReleased => {
+            { tm_end: + new Date().getTime() }).then(tableReleased => {
 
                 return res.status(200).json({
                     ok: true,

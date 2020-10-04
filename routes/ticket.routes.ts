@@ -11,15 +11,16 @@ const ticketRoutes = Router();
 
 // public requests
 ticketRoutes.post('/createticket', ticketController.createTicket);
-ticketRoutes.get('/cancelticket/:idTicket', ticketController.cancelTicket);
-
 ticketRoutes.get('/gettickets/:idCompany', ticketController.getTickets);
+ticketRoutes.get('/callwaiter/:idTicket', ticketController.callWaiter);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
 
-// desktop requests
-ticketRoutes.post('/taketicket', mdAuth.verificaToken, ticketController.takeTicket);
+
+// waiter actions
+ticketRoutes.post('/endticket', ticketController.endTicket);
 ticketRoutes.post('/releaseticket', mdAuth.verificaToken, ticketController.releaseTicket);
-ticketRoutes.post('/endticket', mdAuth.verificaToken, ticketController.endTicket);
 ticketRoutes.post('/reassignticket', mdAuth.verificaToken, ticketController.reassignTicket);
+ticketRoutes.post('/attendedticket', mdAuth.verificaToken, ticketController.attendedTicket);
+
 
 export default ticketRoutes;

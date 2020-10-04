@@ -5,7 +5,7 @@ const tableSchema = new Schema({
     nm_table: {type: Number, required: [true, 'El nm_table es necesario']},
     nm_persons: {type: Number, required: [true, 'El nm_persons es necesario']},
     tx_status: {type: String, required: [true, 'El tx_status es necesario'], default: 'paused'}, // busy, paused, idle
-    id_session: {type: String, required: false},
+    id_session: {type: String, ref: 'TableSession', required: false, default: null},
 
 
 },{ collection: "tables" })
@@ -15,6 +15,6 @@ export interface Table extends Document {
     nm_table: number;
     nm_persons: number;
     tx_status: string;
-    id_session?: string;
+    id_session?: string | null;
 }
 export const Table = model<Table>('Table', tableSchema);

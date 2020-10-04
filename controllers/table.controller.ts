@@ -13,7 +13,6 @@ let createTable = (req: Request, res: Response) => {
         id_section,
         nm_table,
         nm_persons,
-        bl_status: false,
         tx_satus: 'paused',
         id_session: null
     });
@@ -99,7 +98,7 @@ let readSectionTables = (req: Request, res: Response) => {
         Table.find({ id_section: sectionDB._id })
             .populate({
                 path: 'id_session',
-                populate: { path: 'id_waiter id_section' }
+                populate: { path: 'id_ticket' }
             })
             .then(tablesDB => {
                 if (!tablesDB) {

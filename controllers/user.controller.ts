@@ -25,8 +25,8 @@ function createUser(req: any, res: Response) {
     tx_email: body.user.tx_email,
     tx_password: bcrypt.hashSync(body.user.tx_password, 10),
     bl_google: false,
-    fc_lastlogin: null,
-    fc_createdat: new Date(),
+    tm_lastlogin: null,
+    tm_createdat: new Date(),
     id_role: 'ADMIN_ROLE',
   });
 
@@ -148,7 +148,7 @@ async function loginGoogle(req: Request, res: Response) {
               // Google SignIn -> new token
               var token = Token.getJwtToken({ user: userDB });
 
-              userDB.updateOne({ fc_lastlogin: + new Date().getTime() })
+              userDB.updateOne({ tm_lastlogin: + new Date().getTime() })
                 .then(async userSaved => {
 
                   userSaved.tx_password = ":)";
@@ -209,8 +209,8 @@ async function loginGoogle(req: Request, res: Response) {
             user.tx_password = ':)';
             user.tx_img = googleUser.img;
             user.bl_google = true;
-            user.fc_lastlogin = new Date();
-            user.fc_createdat = new Date();
+            user.tm_lastlogin = new Date();
+            user.tm_createdat = new Date();
             user.id_role = 'ADMIN_ROLE';
             user.cd_pricing = 0;
 
@@ -291,7 +291,7 @@ function loginUser(req: Request, res: Response) {
 
       // Si llego hasta acá, el user y la contraseña son correctas, creo el token
       var token = Token.getJwtToken({ user: userDB });
-      userDB.fc_lastlogin = new Date();
+      userDB.tm_lastlogin = new Date();
 
       userDB.save().then(async () => {
 
