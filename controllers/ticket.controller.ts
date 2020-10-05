@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { request, Request, Response } from 'express';
 import Server from '../classes/server';
 
 // MODELS
@@ -170,12 +170,12 @@ function reassignTicket(req: Request, res: Response) {
 function attendedTicket(req: Request, res: Response) {
 
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { bl_called: false, tm_att: + new Date().getTime() }, {new: true}).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { bl_called: false, tm_att: + new Date().getTime() }, { new: true }).then(ticketAttended => {
 
-		if(ticketAttended?.bl_called === false) {
+		if (ticketAttended?.bl_called === false) {
 
 			server.io.to(ticketAttended.id_company).emit('update-clients');
-			
+
 			return res.status(200).json({
 				ok: true,
 				msg: 'El llamado al camarero fue atendido.',
@@ -281,13 +281,16 @@ function createTicket(req: Request, res: Response) {
 			let ticket = new Ticket({
 				id_company: sectionDB.id_company,
 				id_section: idSection,
+				id_session: null,
 				nm_persons: nmPersons,
-				id_position: idPosition,
-				bl_called: true,
 				bl_priority: blPriority,
+				bl_called: true,
+				tx_status: 'queued',
+				id_position: idPosition,
 				id_socket_client: idSocket,
 				id_socket_waiter: null,
 				tm_start: + new Date().getTime(),
+				tm_provided: null,
 				tm_att: null,
 				tm_end: null
 			})
@@ -296,12 +299,10 @@ function createTicket(req: Request, res: Response) {
 
 
 				// SPM: Sistema de Provisión de mesas
-				spm(ticket);
+				spmPush(ticket);
 
 				const server = Server.instance;
-				// welcome message to client
 				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
-				// advice to dekstops in company
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
 				res.status(201).json({
@@ -342,18 +343,18 @@ function createTicket(req: Request, res: Response) {
 function callWaiter(req: Request, res: Response) {
 
 	const idTicket = req.params.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { bl_called: true }, {new: true}).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { bl_called: true }, { new: true }).then(ticketAttended => {
 
-		if(ticketAttended?.bl_called === true) {
+		if (ticketAttended?.bl_called === true) {
 
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
-			
+
 			return res.status(200).json({
 				ok: true,
 				msg: 'El camarero fue llamado.',
 				ticket: ticketAttended
 			})
-			
+
 		}
 
 	}).catch(() => {
@@ -376,7 +377,10 @@ function getTickets(req: Request, res: Response) {
 		id_company: idCompany, // only this company
 		tm_start: { $gt: time }  // only from today
 	})
-
+		.populate({
+			path: 'id_session',
+			populate: { path: 'id_table' }
+		})
 		.then((tickets) => {
 
 			if (tickets.length > 0) {
@@ -516,61 +520,41 @@ function endTicket(req: Request, res: Response) {
 
 
 
-// sistema de provisión de mesas
-let spm = (ticket: Ticket) => {
+// nuevo ticket (empuja)
+let spmPush = (ticket: Ticket) => {
 
-	/*
-	1. verifico que exista al menos una mesa para la cantidad solicitada, si no existe el status pasa de 'queued' a 'requested'
-	2. si existe y el status es 'idle' el estado pasa de queue a 'assigned', si es busy el estado persiste en 'queued' 
-	*/
-	// buscar una mesa para 'ticket'
-	Table.find({ nm_persons: { $gte: ticket.nm_persons }, id_section: ticket.id_section }).then(tablesDB => {
-		// no existe, 'queued' -> 'requested'
-		if (tablesDB.length === 0) { // no existen mesas para la solicitud
-			Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then(result => {
-			}).catch(err => {
+	Table.find({ 
+		nm_persons: { $gte: ticket.nm_persons }, 
+		id_section: ticket.id_section 
+	}).then(candidateTablesDB => {
+
+		// no existen mesas para esta solicitud -> 'requested'
+		if (candidateTablesDB.length === 0) {
+			Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then(() => {
+				return;
 			})
-			return;
 		}
-		// existe, verifico si hay disponibilidad
-		let idleTables = tablesDB.filter(table => table.tx_status === 'idle');
+
+		let idleTables = candidateTablesDB.filter(table => table.tx_status === 'idle');
 
 		if (idleTables.length > 0) {
-
 			let session = new TableSession();
-
-			let idTable = idleTables[0]._id;
-			let idTicket = ticket._id;
-			session.id_table = idTable;
-			session.id_ticket = idTicket;
+			session.id_table = idleTables[0]._id;
+			session.id_ticket = ticket._id;
 			session.tm_start = + new Date();
-
 			session.save().then(sessionSaved => {
-
-				let idSession = sessionSaved._id;
-
-				// update ticket
-				Ticket.findByIdAndUpdate(ticket._id, {
-					tx_status: 'assigned',
-					id_session: idSession,
-					tm_provided: + new Date()
-					// todo: asignar el socket del camaero en el ticket
-				}).then(result => {
-				}).catch(err => {
+				idleTables[0].tx_status = 'busy';
+				idleTables[0].id_session = sessionSaved._id;
+				idleTables[0].save().then(tableSaved => {
+					ticket.tx_status = 'assigned';
+					ticket.id_session = sessionSaved._id;
+					ticket.tm_provided = + new Date();
+					ticket.save().then(ticketSaved => {
+					})
 				})
-
-				// update table
-				Table.findByIdAndUpdate(idTable, {
-					tx_status: 'busy',
-					id_session: idSession
-				}, { new: true }).then(tableDB => {
-				}).catch(err => {
-				})
-
-
-
 			})
 		}
+
 	})
 }
 
@@ -584,4 +568,5 @@ export = {
 	endTicket,
 	getTickets,
 	updateSocket,
+	spmPush
 }

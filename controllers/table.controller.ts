@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
-
+import { Ticket } from '../models/ticket.model';
+import { TableSession } from '../models/table.session.model';
+import Server from '../classes/server';
 // ========================================================
 // Table Methods
 // ========================================================
@@ -135,32 +137,53 @@ let toggleTableStatus = (req: Request, res: Response) => {
     let idTable = req.params.idTable;
 
 
-    Table.findById(idTable).then(tableDB => {
-        
-        if(!tableDB){
+    Table.findById(idTable).then(async tableDB => {
+
+        let sectionDB = await Section.findById(tableDB?.id_section);
+
+        if (!tableDB) {
             res.status(400).json({
                 ok: false,
                 msg: 'No existe la mesa',
                 table: null
             })
         } else {
-            tableDB.tx_status = tableDB?.tx_status==='idle' ? 'paused' : 'idle';
-            tableDB.save().then(statusSaved => {
-                res.status(200).json({
+
+            if (tableDB.tx_status === 'paused' || tableDB.tx_status === 'reserved') {
+                tableDB.tx_status = 'idle';
+            } else if (tableDB.tx_status === 'idle') {
+                tableDB.tx_status = 'paused';
+            }
+
+            tableDB.save().then(async statusSaved => {
+
+                let msg: string;
+                if (statusSaved.tx_status === 'idle') {
+                    msg = await spmPull(tableDB);
+                } else {
+                    msg = 'La mesa fue pausada correctamente'
+                }
+
+                if (sectionDB) {
+                    const server = Server.instance;
+                    server.io.to(sectionDB.id_company).emit('update-waiters');
+                }
+
+                return res.status(200).json({
                     ok: true,
                     msg: 'El nuevo estado de mesa fue guardado',
                     table: statusSaved
                 })
             }).catch(() => {
-                res.status(500).json({
-                    ok: false, 
+                return res.status(500).json({
+                    ok: false,
                     msg: 'No se pudo guardar el nuevo estado de mesa',
                     table: null
                 })
             })
         }
 
-        
+
     })
 }
 
@@ -181,11 +204,49 @@ let deleteTable = (req: Request, res: Response) => {
     })
 }
 
+// se libera una mesa (tira)
+let spmPull = (table: Table): Promise<string> => {
+    return new Promise((resolve) => {
+
+        let year = + new Date().getFullYear();
+        let month = + new Date().getMonth();
+        let day = + new Date().getDate();
+        let time = + new Date(year, month, day).getTime();
+
+        Ticket.findOne({
+            id_section: table.id_section, // only this company
+            tm_start: { $gt: time },  // only from today
+            tm_provided: null,
+            tm_att: null,
+            tm_end: null,
+            nm_persons: { $lte: table.nm_persons }
+        }).then(ticketDB => {
+            if (!ticketDB) { return resolve('Mesa liberada. No hay clientes para esta mesa') }
+            let session = new TableSession();
+            session.id_table = table._id;
+            session.id_ticket = ticketDB._id;
+            session.tm_start = + new Date();
+            session.save().then(sessionSaved => {
+                table.tx_status = 'busy';
+                table.id_session = sessionSaved._id;
+                table.save().then(tableSaved => {
+                    ticketDB.tx_status = 'assigned';
+                    ticketDB.id_session = sessionSaved._id;
+                    ticketDB.tm_provided = + new Date();
+                    ticketDB.save().then(ticketSaved => {
+                        return resolve('Un nuevo cliente fue asignado a esta mesa');
+                    })
+                })
+            })
+        })
+    })
+}
 
 export = {
     createTable,
     readTables,
     readSectionTables,
     toggleTableStatus,
-    deleteTable
+    deleteTable,
+    spmPull
 }

@@ -3,7 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 const ticketsSchema = new Schema({
     id_company: {type: String, ref: 'Company', required: [true, 'El id_company es necesario']},
     id_section: {type: String, ref: 'Section', required: [true, 'El id_section es necesario']},
-    id_session: {type: String, ref: 'Session', required: false, default: null},
+    id_session: {type: String, ref: 'TableSession', required: false, default: null},
     nm_persons: {type: Number, required: [true, 'El nm_persons es necesario']},
     bl_priority: {type: Boolean, required: true, default: false},
     bl_called: {type: Boolean, required: true, default: true},
