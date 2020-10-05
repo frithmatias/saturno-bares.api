@@ -7,6 +7,7 @@ import PublicController from '../controllers/public.controller';
 const publicRoutes = Router();
 publicRoutes.get('/getuserdata/:company', PublicController.getClientData);
 publicRoutes.post('/contact', PublicController.postContact);
-publicRoutes.post('/scores', PublicController.postScore);
+publicRoutes.post('/postscores', PublicController.postScores);
+publicRoutes.get('/getscoreitems/:idSection', PublicController.getScoreItems);
 
 export default publicRoutes; 

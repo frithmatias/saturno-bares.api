@@ -378,7 +378,7 @@ function getTickets(req: Request, res: Response) {
 		tm_start: { $gt: time }  // only from today
 	})
 		.populate({
-			path: 'id_session',
+			path: 'id_session id_section',
 			populate: { path: 'id_table' }
 		})
 		.then((tickets) => {
@@ -477,14 +477,9 @@ function endTicket(req: Request, res: Response) {
 
 				let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
 				Table.findByIdAndUpdate(sessionCanceled?.id_table, { tx_status: new_status, id_session: null }).then(tableCanceled => {
-
-					if (ticketCanceled.id_socket_waiter) {
-						// cancel dekstop session and update tickets on waiter table 
-						server.io.to(ticketCanceled.id_socket_waiter).emit('ticket-cancelled', ticketCanceled._id);
-					} else {
-						// update tickets on tables
-						server.io.to(ticketCanceled.id_company).emit('update-waiters');
-					}
+					 
+					server.io.to(ticketCanceled.id_company).emit('update-clients');
+					server.io.to(ticketCanceled.id_company).emit('update-waiters');
 
 					return res.status(200).json({
 						ok: true,

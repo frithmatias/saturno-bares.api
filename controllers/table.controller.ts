@@ -167,6 +167,8 @@ let toggleTableStatus = (req: Request, res: Response) => {
                 if (sectionDB) {
                     const server = Server.instance;
                     server.io.to(sectionDB.id_company).emit('update-waiters');
+				    server.io.to(sectionDB.id_company).emit('update-clients');
+
                 }
 
                 return res.status(200).json({
