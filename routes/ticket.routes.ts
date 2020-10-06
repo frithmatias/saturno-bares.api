@@ -11,7 +11,7 @@ const ticketRoutes = Router();
 
 // public requests
 ticketRoutes.post('/createticket', ticketController.createTicket);
-ticketRoutes.get('/gettickets/:idCompany', ticketController.getTickets);
+ticketRoutes.get('/readtickets/:idCompany', ticketController.readTickets);
 ticketRoutes.get('/callwaiter/:idTicket', ticketController.callWaiter);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
 

@@ -4,6 +4,7 @@ import { Section } from '../models/section.model';
 import { Ticket } from '../models/ticket.model';
 import { TableSession } from '../models/table.session.model';
 import Server from '../classes/server';
+
 // ========================================================
 // Table Methods
 // ========================================================
@@ -36,7 +37,8 @@ let createTable = (req: Request, res: Response) => {
 let readTables = (req: Request, res: Response) => {
     let idCompany = req.params.idCompany;
 
-    Section.find({ id_company: idCompany }).then(sectionsDB => {
+    Section.find({ id_company: idCompany })
+    .then(sectionsDB => {
 
         if (!sectionsDB || sectionsDB.length === 0) {
             return res.status(400).json({
@@ -50,54 +52,6 @@ let readTables = (req: Request, res: Response) => {
         let idSections = sectionsDB.map(section => section._id)
 
         Table.find({ id_section: { $in: idSections } })
-            .populate({
-                path: 'id_session',
-                populate: { path: 'id_waiter' }
-            })
-            .then(tablesDB => {
-                if (!tablesDB) {
-                    return res.status(400).json({
-                        ok: false,
-                        msg: 'No existen escritorios para la empresa seleccionada',
-                        tables: null
-                    })
-                }
-                return res.status(200).json({
-                    ok: true,
-                    msg: 'Mesas obtenidas correctamente',
-                    tables: tablesDB
-                })
-            }).catch(() => {
-                return res.status(500).json({
-                    ok: false,
-                    msg: 'Error al consultar las mesas para los sectores de la empresa.',
-                    tables: null
-                })
-
-            })
-    }).catch(() => {
-        return res.status(500).json({
-            ok: false,
-            msg: 'Error al consultar los sectores para la empresa solicitada.',
-            tables: null
-        })
-
-    })
-}
-
-let readSectionTables = (req: Request, res: Response) => {
-    let idSection = req.params.idSection;
-    Section.findById(idSection).then(sectionDB => {
-
-        if (!sectionDB) {
-            return res.status(400).json({
-                ok: false,
-                msg: 'No existe el sector solicitado',
-                tables: null
-            })
-        }
-
-        Table.find({ id_section: sectionDB._id })
             .populate({
                 path: 'id_session',
                 populate: { path: 'id_ticket' }
@@ -206,7 +160,6 @@ let deleteTable = (req: Request, res: Response) => {
     })
 }
 
-// se libera una mesa (tira)
 let spmPull = (table: Table): Promise<string> => {
     return new Promise((resolve) => {
 
@@ -247,7 +200,6 @@ let spmPull = (table: Table): Promise<string> => {
 export = {
     createTable,
     readTables,
-    readSectionTables,
     toggleTableStatus,
     deleteTable,
     spmPull

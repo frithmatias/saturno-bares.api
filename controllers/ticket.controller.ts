@@ -366,7 +366,7 @@ function callWaiter(req: Request, res: Response) {
 	})
 };
 
-function getTickets(req: Request, res: Response) {
+function readTickets(req: Request, res: Response) {
 	const idCompany = req.params.idCompany;
 	let year = + new Date().getFullYear();
 	let month = + new Date().getMonth();
@@ -561,7 +561,7 @@ export = {
 	reassignTicket,
 	attendedTicket,
 	endTicket,
-	getTickets,
+	readTickets,
 	updateSocket,
 	spmPush
 }
