@@ -8,6 +8,7 @@ const ticketsSchema = new Schema({
     bl_priority: {type: Boolean, required: true, default: false},
     bl_called: {type: Boolean, required: true, default: true},
     tx_status: {type: String, required: [true, 'El tx_status es necesario'], default: 'queued'},
+    cd_tables: {type: [Number], required: false}, // only for requested and assigned tickets
     id_position: {type: Number, required: [true, 'El id_position es necesario']},
     id_socket_client: {type: String, required: [true, 'El id_socket_client es necesario']},
     id_socket_waiter: {type: String, required: false},
@@ -24,7 +25,8 @@ export interface Ticket extends Document {
     nm_persons: number; // requested
     bl_priority: boolean; // requested
     bl_called: boolean;
-    tx_status: string; // assigned [privided, assigned, queued, requested]
+    tx_status: string; // assigned [provided, assigned, queued, requested]
+    cd_tables?: [number]; // only for requested and assigned tickets
     id_position: number; // assigned
     id_socket_client: string; // primary
     id_socket_waiter?: string | null; // assigned

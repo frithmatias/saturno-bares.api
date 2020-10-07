@@ -38,53 +38,53 @@ let readTables = (req: Request, res: Response) => {
     let idCompany = req.params.idCompany;
 
     Section.find({ id_company: idCompany })
-    .then(sectionsDB => {
+        .then(sectionsDB => {
 
-        if (!sectionsDB || sectionsDB.length === 0) {
-            return res.status(400).json({
-                ok: false,
-                msg: 'No existen sectores para la empresa solicitada',
-                tables: null
-            })
-        }
-
-        // sections of company
-        let idSections = sectionsDB.map(section => section._id)
-
-        Table.find({ id_section: { $in: idSections } })
-            .populate({
-                path: 'id_session',
-                populate: { path: 'id_ticket' }
-            })
-            .then(tablesDB => {
-                if (!tablesDB) {
-                    return res.status(400).json({
-                        ok: false,
-                        msg: 'No existen escritorios para la empresa seleccionada',
-                        tables: null
-                    })
-                }
-                return res.status(200).json({
-                    ok: true,
-                    msg: 'Mesas obtenidas correctamente',
-                    tables: tablesDB
-                })
-            }).catch(() => {
-                return res.status(500).json({
+            if (!sectionsDB || sectionsDB.length === 0) {
+                return res.status(400).json({
                     ok: false,
-                    msg: 'Error al consultar las mesas para los sectores de la empresa.',
+                    msg: 'No existen sectores para la empresa solicitada',
                     tables: null
                 })
+            }
 
+            // sections of company
+            let idSections = sectionsDB.map(section => section._id)
+
+            Table.find({ id_section: { $in: idSections } })
+                .populate({
+                    path: 'id_session',
+                    populate: { path: 'id_ticket' }
+                })
+                .then(tablesDB => {
+                    if (!tablesDB) {
+                        return res.status(400).json({
+                            ok: false,
+                            msg: 'No existen escritorios para la empresa seleccionada',
+                            tables: null
+                        })
+                    }
+                    return res.status(200).json({
+                        ok: true,
+                        msg: 'Mesas obtenidas correctamente',
+                        tables: tablesDB
+                    })
+                }).catch(() => {
+                    return res.status(500).json({
+                        ok: false,
+                        msg: 'Error al consultar las mesas para los sectores de la empresa.',
+                        tables: null
+                    })
+
+                })
+        }).catch(() => {
+            return res.status(500).json({
+                ok: false,
+                msg: 'Error al consultar los sectores para la empresa solicitada.',
+                tables: null
             })
-    }).catch(() => {
-        return res.status(500).json({
-            ok: false,
-            msg: 'Error al consultar los sectores para la empresa solicitada.',
-            tables: null
-        })
 
-    })
+        })
 }
 
 let toggleTableStatus = (req: Request, res: Response) => {
@@ -114,6 +114,7 @@ let toggleTableStatus = (req: Request, res: Response) => {
                 let msg: string;
                 if (statusSaved.tx_status === 'idle') {
                     msg = await spmPull(tableDB);
+                    console.log(msg)
                 } else {
                     msg = 'La mesa fue pausada correctamente'
                 }
@@ -121,7 +122,7 @@ let toggleTableStatus = (req: Request, res: Response) => {
                 if (sectionDB) {
                     const server = Server.instance;
                     server.io.to(sectionDB.id_company).emit('update-waiters');
-				    server.io.to(sectionDB.id_company).emit('update-clients');
+                    server.io.to(sectionDB.id_company).emit('update-clients');
 
                 }
 
@@ -168,34 +169,104 @@ let spmPull = (table: Table): Promise<string> => {
         let day = + new Date().getDate();
         let time = + new Date(year, month, day).getTime();
 
-        Ticket.findOne({
+        // busco el primer turno (sin filtro por cantidad de comensales)
+        Ticket.find({
             id_section: table.id_section, // only this company
             tm_start: { $gt: time },  // only from today
             tm_provided: null,
             tm_att: null,
-            tm_end: null,
-            nm_persons: { $lte: table.nm_persons }
-        }).then(ticketDB => {
-            if (!ticketDB) { return resolve('Mesa liberada. No hay clientes para esta mesa') }
-            let session = new TableSession();
-            session.id_table = table._id;
-            session.id_ticket = ticketDB._id;
-            session.tm_start = + new Date();
-            session.save().then(sessionSaved => {
-                table.tx_status = 'busy';
-                table.id_session = sessionSaved._id;
-                table.save().then(tableSaved => {
-                    ticketDB.tx_status = 'assigned';
-                    ticketDB.id_session = sessionSaved._id;
-                    ticketDB.tm_provided = + new Date();
-                    ticketDB.save().then(ticketSaved => {
-                        return resolve('Un nuevo cliente fue asignado a esta mesa');
+            tm_end: null
+        }).then(ticketsDB => {
+            let ticket: Ticket;
+            ticket = ticketsDB[0]; // el primer ticket
+            if (!ticket) { return resolve('Mesa liberada. No hay clientes para esta mesa') }
+
+            // Si el turno le toca a un requerido y la mesa liberada le corresponde queda reservada
+            if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
+                table.tx_status = 'reserved';
+                table.save().then(() => {
+                    // verifico si estan reservadas todas las mesas asignadas al ticket
+                    Table.find({
+                        id_section: table.id_section,
+                        nm_table: { $in: ticket.cd_tables },
+                        tx_status: 'reserved'
+                    }).then(tablesReserved => {
+                        if (tablesReserved.length === ticket.cd_tables?.length) {
+                            // si todas las mesas necesarias fueron reservadas, pasan a ser proveídas
+                            provideMulti(tablesReserved, ticket).then((resp) => {
+                                if (resp) {
+                                    resolve('Mesa aprovisionada correctamente')
+                                }
+                            }).catch(() => {
+                                resolve('Error al aprovisionar la mesa')
+                            })
+                        }
                     })
                 })
+
+            } else {
+                
+                // si el siguiente turno no es un requerido o es un requerido pero se libero una mesa que 
+                // no le fue asignada entonces obtengo un ticket que cumpla con la capacidad de la mesa.
+                ticket = ticketsDB.filter(ticket => ticket.nm_persons <= table.nm_persons)[0];
+                provideSingle(table, ticket).then((resp) => {
+                    if (resp) {
+                        resolve('Mesa aprovisionada correctamente')
+                    }
+                }).catch(() => {
+                    resolve('Error al aprovisionar la mesa')
+                })
+            }
+        })
+    })
+}
+
+let provideSingle = (table: Table, ticket: Ticket): Promise<Boolean> => {
+    return new Promise((resolve, reject) => {
+        let session = new TableSession();
+        session.id_table = table._id;
+        session.id_ticket = ticket._id;
+        session.tm_start = + new Date();
+        session.save().then(sessionSaved => {
+            table.tx_status = 'busy';
+            table.id_session = sessionSaved._id;
+            table.save().then(tableSaved => {
+                ticket.tx_status = 'provided';
+                ticket.id_session = sessionSaved._id;
+                ticket.tm_provided = + new Date();
+                ticket.save().then(ticketSaved => {
+                    return resolve(true);
+                }).catch(() => reject(false))
             })
         })
     })
 }
+
+let provideMulti = (tables: Table[], ticket: Ticket): Promise<Boolean> => {
+    return new Promise((resolve, reject) => {
+        let session = new TableSession();
+        let idTables: string[] = tables.map(table => table._id);
+        session.id_table = idTables;
+        session.id_ticket = ticket._id;
+        session.tm_start = + new Date();
+        session.save().then(sessionSaved => {
+            for (let table of tables) {
+                table.tx_status = 'busy';
+                table.id_session = sessionSaved._id;
+                table.save().then(tableSaved => {
+                    ticket.tx_status = 'provided';
+                    ticket.id_session = sessionSaved._id;
+                    ticket.tm_provided = + new Date();
+                    ticket.save().then(ticketSaved => {
+                        return resolve(true);
+                    }).catch(() => reject(false))
+                })
+            }
+
+        })
+    })
+}
+
 
 export = {
     createTable,

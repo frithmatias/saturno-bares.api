@@ -476,25 +476,29 @@ function endTicket(req: Request, res: Response) {
 			TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(sessionCanceled => {
 
 				let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
-				Table.findByIdAndUpdate(sessionCanceled?.id_table, { tx_status: new_status, id_session: null }).then(tableCanceled => {
-					 
-					server.io.to(ticketCanceled.id_company).emit('update-clients');
-					server.io.to(ticketCanceled.id_company).emit('update-waiters');
 
-					return res.status(200).json({
-						ok: true,
-						msg: "Ticket finalizado correctamente",
-						ticket: ticketCanceled
+				if (!sessionCanceled) {
+					return;
+				}
+
+				// en una sesión de mesa puedo tener asignadas una o mas mesas
+				for (let idTable of sessionCanceled?.id_table) {
+					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
+						return res.status(200).json({
+							ok: true,
+							msg: "Ticket finalizado correctamente",
+							ticket: ticketCanceled
+						})
+					}).catch(() => {
+						return res.status(400).json({
+							ok: false,
+							msg: "No se pudo habilitar la mesa",
+							ticket: null
+						})
 					})
-
-				}).catch(() => {
-					return res.status(400).json({
-						ok: false,
-						msg: "No se pudo habilitar la mesa",
-						ticket: null
-					})
-				})
-
+				}
+				server.io.to(ticketCanceled.id_company).emit('update-clients');
+				server.io.to(ticketCanceled.id_company).emit('update-waiters');
 			}).catch(() => {
 				return res.status(400).json({
 					ok: false,
@@ -513,14 +517,14 @@ function endTicket(req: Request, res: Response) {
 	})
 }
 
+// todo: metodo de asignación de mesas requeridas assignTicket() luego debe hacer un push.
 
-
-// nuevo ticket (empuja)
+// nuevo ticket (push)
 let spmPush = (ticket: Ticket) => {
 
-	Table.find({ 
-		nm_persons: { $gte: ticket.nm_persons }, 
-		id_section: ticket.id_section 
+	Table.find({
+		nm_persons: { $gte: ticket.nm_persons },
+		id_section: ticket.id_section
 	}).then(candidateTablesDB => {
 
 		// no existen mesas para esta solicitud -> 'requested'
@@ -541,7 +545,7 @@ let spmPush = (ticket: Ticket) => {
 				idleTables[0].tx_status = 'busy';
 				idleTables[0].id_session = sessionSaved._id;
 				idleTables[0].save().then(tableSaved => {
-					ticket.tx_status = 'assigned';
+					ticket.tx_status = 'provided';
 					ticket.id_session = sessionSaved._id;
 					ticket.tm_provided = + new Date();
 					ticket.save().then(ticketSaved => {
