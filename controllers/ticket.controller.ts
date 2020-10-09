@@ -484,6 +484,8 @@ function endTicket(req: Request, res: Response) {
 				// en una sesión de mesa puedo tener asignadas una o mas mesas
 				for (let idTable of sessionCanceled?.id_table) {
 					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
+						server.io.to(ticketCanceled.id_company).emit('update-waiters');
+
 						return res.status(200).json({
 							ok: true,
 							msg: "Ticket finalizado correctamente",
@@ -497,8 +499,6 @@ function endTicket(req: Request, res: Response) {
 						})
 					})
 				}
-				server.io.to(ticketCanceled.id_company).emit('update-clients');
-				server.io.to(ticketCanceled.id_company).emit('update-waiters');
 			}).catch(() => {
 				return res.status(400).json({
 					ok: false,
