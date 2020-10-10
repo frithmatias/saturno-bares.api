@@ -4,6 +4,7 @@ import { Section } from '../models/section.model';
 import { Ticket } from '../models/ticket.model';
 import { TableSession } from '../models/table.session.model';
 import Server from '../classes/server';
+import tkt from './ticket.controller';
 
 // ========================================================
 // Table Methods
@@ -87,6 +88,37 @@ let readTables = (req: Request, res: Response) => {
         })
 }
 
+let readSectionTables = (req: Request, res: Response) => {
+    let idSection = req.params.idSection;
+    Table.find({ id_section: idSection })
+        .populate({
+            path: 'id_session',
+            populate: { path: 'id_ticket' }
+        })
+        .then(tablesDB => {
+            if (!tablesDB) {
+                return res.status(400).json({
+                    ok: false,
+                    msg: 'No existen escritorios para la empresa seleccionada',
+                    tables: null
+                })
+            }
+            return res.status(200).json({
+                ok: true,
+                msg: 'Mesas obtenidas correctamente',
+                tables: tablesDB
+            })
+        }).catch(() => {
+            return res.status(500).json({
+                ok: false,
+                msg: 'Error al consultar las mesas para los sectores de la empresa.',
+                tables: null
+            })
+
+        })
+
+}
+
 let toggleTableStatus = (req: Request, res: Response) => {
     let idTable = req.params.idTable;
 
@@ -143,21 +175,47 @@ let toggleTableStatus = (req: Request, res: Response) => {
     })
 }
 
-let reserveTables = (req: Request, res: Response) => {
-    var { idTicket, cdTables } = req.body;
-    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: 'assigned' }).then(ticketSaved => {
-        
-        if( !ticketSaved ){
+let assignTables = (req: Request, res: Response) => {
+    var { idTicket, cdTables, blProvide } = req.body;
+    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: 'assigned' }, { new: true }).then(ticketSaved => {
+
+        if (!ticketSaved) {
             return res.status(400).json({
                 ok: false,
                 msg: 'Error al asignar las mesas',
                 ticket: null
             })
         }
-        
+
         const server = Server.instance;
         server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
-        
+        server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
+
+        if(blProvide){
+            Table.find({
+                id_section: ticketSaved.id_section,
+                nm_table: { $in: cdTables }
+            }).then(tablesAssigned => {
+                spmProvide(tablesAssigned, ticketSaved).then((resp) => {
+                    if (resp) {
+                        server.io.to(ticketSaved.id_company).emit('update-waiters');
+                        server.io.to(ticketSaved.id_company).emit('update-clients');
+                    }
+                }).catch(() => {
+                    return res.status(400).json({
+                        ok: true,
+                        msg: 'Error al proveer las mesas',
+                        ticket: ticketSaved
+                    })
+                })
+            })
+            return res.status(200).json({
+                ok: true,
+                msg: 'Las mesas fueron asignadas y proveídas correctamente',
+                ticket: ticketSaved
+            })
+        }
+
         return res.status(200).json({
             ok: true,
             msg: 'Las mesas fueron asignadas correctamente',
@@ -208,41 +266,33 @@ let spmPull = (table: Table): Promise<string> => {
             tm_att: null,
             tm_end: null
         }).then(ticketsDB => {
+
             let ticket: Ticket;
             ticket = ticketsDB[0];
             if (!ticket) { return resolve('Mesa liberada. No hay clientes para esta mesa') }
 
-            // Si el turno le toca a un 'assigned' y la mesa liberada le corresponde queda reservada
+            // Se comienza a reservar mesas de un requerido SOLO CUANDO se encuentra en la PRIMERA posición y la mesa liberada le corresponde
             if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
-                table.tx_status = 'reserved';
-                table.save().then(() => {
-                    // verifico si estan reservadas todas las mesas asignadas al ticket
-                    Table.find({
-                        id_section: table.id_section,
-                        nm_table: { $in: ticket.cd_tables },
-                        tx_status: 'reserved'
-                    }).then(tablesReserved => {
-                        if (tablesReserved.length === ticket.cd_tables?.length) {
-                            // si todas las mesas asignadas al ticket fueron reservadas, pasan a ser proveídas
-                            provideMulti(tablesReserved, ticket).then((resp) => {
-                                if (resp) {
-                                    server.io.to(ticket.id_company).emit('update-waiters'); // mesas proveídas
-                                    resolve('Mesa aprovisionada correctamente')
-                                }
-                            }).catch(() => {
-                                resolve('Error al aprovisionar la mesa')
-                            })
-                        } else {
-                            server.io.to(ticket.id_company).emit('update-waiters'); // mesa reservada
+                Table.find({
+                    id_section: table.id_section,
+                    nm_table: { $in: ticket.cd_tables }
+                }).then(tablesAssigned => {
+                    spmProvide(tablesAssigned, ticket).then((resp) => {
+                        if (resp) {
+                            server.io.to(ticket.id_company).emit('update-waiters');
+                            server.io.to(ticket.id_company).emit('update-clients');
+                            resolve('Mesa aprovisionada correctamente')
                         }
+                    }).catch(() => {
+                        resolve('Error al aprovisionar la mesa')
                     })
                 })
-
-            } else { // necesita sólo una mesa, o necesita varias pero no le corresponde la mesa liberada
+            } else {
                 ticket = ticketsDB.filter(ticket => ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)[0];
-                provideSingle(table, ticket).then((resp) => {
+                spmProvide([table], ticket).then((resp) => {
                     if (resp) {
-                        server.io.to(ticket.id_company).emit('update-waiters'); // mesas proveídas
+                        server.io.to(ticket.id_company).emit('update-waiters');
+                        server.io.to(ticket.id_company).emit('update-clients');
                         resolve('Mesa aprovisionada correctamente')
                     }
                 }).catch(() => {
@@ -253,58 +303,51 @@ let spmPull = (table: Table): Promise<string> => {
     })
 }
 
-let provideSingle = (table: Table, ticket: Ticket): Promise<Boolean> => {
+let spmProvide = (tables: Table[], ticket: Ticket): Promise<Boolean> => {
     return new Promise((resolve, reject) => {
-        let session = new TableSession();
-        session.id_table = table._id;
-        session.id_ticket = ticket._id;
-        session.tm_start = + new Date();
-        session.save().then(sessionSaved => {
-            table.tx_status = 'busy';
-            table.id_session = sessionSaved._id;
-            table.save().then(tableSaved => {
-                ticket.tx_status = 'provided';
-                ticket.id_session = sessionSaved._id;
-                ticket.tm_provided = + new Date();
-                ticket.save().then(ticketSaved => {
-                    return resolve(true);
-                }).catch(() => reject(false))
-            })
-        })
-    })
-}
 
-let provideMulti = (tables: Table[], ticket: Ticket): Promise<Boolean> => {
-    return new Promise((resolve, reject) => {
-        let session = new TableSession();
-        let idTables: string[] = tables.map(table => table._id);
-        session.id_table = idTables;
-        session.id_ticket = ticket._id;
-        session.tm_start = + new Date();
-        session.save().then(sessionSaved => {
-            for (let table of tables) {
-                table.tx_status = 'busy';
-                table.id_session = sessionSaved._id;
-                table.save().then(tableSaved => {
-                    ticket.tx_status = 'provided';
-                    ticket.id_session = sessionSaved._id;
-                    ticket.tm_provided = + new Date();
-                    ticket.save().then(ticketSaved => {
-                        return resolve(true);
-                    }).catch(() => reject(false))
-                })
+        for (let table of tables) {
+            if (table.tx_status === 'idle') {
+                table.tx_status = 'reserved';
+                table.save().then(() => console.log('La mesa contigua libre fue reservada'))
             }
+        }
 
-        })
+        let tablesReserved = tables.filter(table => table.tx_status === 'reserved')
+
+        if (tablesReserved.length === ticket.cd_tables?.length) {
+
+            let session = new TableSession();
+            let idTables: string[] = tables.map(table => table._id);
+            session.id_tables = idTables;
+            session.id_ticket = ticket._id;
+            session.tm_start = + new Date();
+            session.save().then(sessionSaved => {
+                for (let table of tables) {
+                    table.tx_status = 'busy';
+                    table.id_session = sessionSaved._id;
+                    table.save().then(tableSaved => {
+                        ticket.tx_status = 'provided';
+                        ticket.id_session = sessionSaved._id;
+                        ticket.tm_provided = + new Date();
+                        ticket.save().then(ticketSaved => {
+                            return resolve(true);
+                        }).catch(() => reject(false))
+                    })
+                }
+
+            })
+        }
     })
 }
-
 
 export = {
     createTable,
     readTables,
+    readSectionTables,
     toggleTableStatus,
-    reserveTables,
+    assignTables,
     deleteTable,
-    spmPull
+    spmPull,
+    spmProvide
 }

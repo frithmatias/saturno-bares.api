@@ -174,7 +174,8 @@ function attendedTicket(req: Request, res: Response) {
 
 		if (ticketAttended?.bl_called === false) {
 
-			server.io.to(ticketAttended.id_company).emit('update-clients');
+			server.io.to(ticketAttended.id_company).emit('update-waiters');
+			server.io.to(ticketAttended.id_socket_client).emit('update-clients');
 
 			return res.status(200).json({
 				ok: true,
@@ -194,30 +195,114 @@ function attendedTicket(req: Request, res: Response) {
 };
 
 function releaseTicket(req: Request, res: Response) {
-	const idTicket = req.body.idTicket;
-
-	Ticket.findByIdAndUpdate(idTicket, {
+	const ticket: Ticket = req.body.ticket;
+	Ticket.findByIdAndUpdate(ticket._id, {
 		tx_status: 'queued',
-		tm_provided: null,
-		tm_att: null,
-		id_socket_waiter: null,
 		id_session: null,
-		tm_end: null
-	}, { new: true }).then(ticketReleased => {
-		if (ticketReleased?.id_company) { server.io.to(ticketReleased.id_company).emit('update-clients'); }
-		return res.status(200).json({
-			ok: true,
-			msg: 'Ticket soltado correctamente',
-			ticket: ticketReleased
+		cd_tables: ticket.cd_tables,
+		tm_provided: null,
+		tm_att: null
+	}).then((ticketCanceled) => {
+
+		if (!ticketCanceled) {
+			return res.status(400).json({
+				ok: false,
+				msg: "No se pudo guardar el ticket con su estado anterior",
+				ticket: null
+			})
+		}
+
+		let idSession = ticketCanceled.id_session;
+		// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
+		TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(sessionCanceled => {
+			if (!sessionCanceled) {
+				return res.status(400).json({
+					ok: false,
+					msg: "No se pudo cancelar la sesión de la mesa",
+					ticket: null
+				})
+			}
+			// en una sesión de mesa puedo tener asignadas una o mas mesas
+			let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
+			for (let idTable of sessionCanceled?.id_tables) {
+				Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
+					server.io.to(ticketCanceled.id_company).emit('update-waiters');
+					server.io.to(ticketCanceled.id_company).emit('update-clients');
+					return res.status(200).json({
+						ok: true,
+						msg: "Ticket finalizado correctamente",
+						ticket: ticketCanceled
+					})
+				}).catch(() => {
+					return res.status(400).json({
+						ok: false,
+						msg: "No se pudo habilitar la mesa",
+						ticket: null
+					})
+				})
+			}
+		}).catch(() => {
+			return res.status(400).json({
+				ok: false,
+				msg: "No se pudo cancelar la sesion de mesa",
+				ticket: null
+			})
 		})
+
 	}).catch(() => {
 		return res.status(400).json({
 			ok: false,
-			msg: 'No se pudo soltar el ticket',
+			msg: "No se pudo finalizar el ticket",
 			ticket: null
 		})
 	})
-};
+}
+
+function endTicket(req: Request, res: Response) {
+	const idTicket = req.body.idTicket;
+	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: + new Date().getTime() }).then((ticketCanceled) => {
+		if (ticketCanceled?.id_session) {
+			let idSession = ticketCanceled.id_session;
+			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
+			TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(sessionCanceled => {
+				let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
+				if (!sessionCanceled) {
+					return;
+				}
+				// en una sesión de mesa puedo tener asignadas una o mas mesas
+				for (let idTable of sessionCanceled?.id_tables) {
+					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
+						server.io.to(ticketCanceled.id_company).emit('update-waiters');
+						server.io.to(ticketCanceled.id_company).emit('update-clients');
+						return res.status(200).json({
+							ok: true,
+							msg: "Ticket finalizado correctamente",
+							ticket: ticketCanceled
+						})
+					}).catch(() => {
+						return res.status(400).json({
+							ok: false,
+							msg: "No se pudo habilitar la mesa",
+							ticket: null
+						})
+					})
+				}
+			}).catch(() => {
+				return res.status(400).json({
+					ok: false,
+					msg: "No se pudo cancelar la sesion de mesa",
+					ticket: null
+				})
+			})
+		}
+	}).catch(() => {
+		return res.status(400).json({
+			ok: false,
+			msg: "No se pudo finalizar el ticket",
+			ticket: null
+		})
+	})
+}
 
 // ========================================================
 // public methods
@@ -379,7 +464,7 @@ function readTickets(req: Request, res: Response) {
 	})
 		.populate({
 			path: 'id_session id_section',
-			populate: { path: 'id_table' }
+			populate: { path: '[id_tables]' }
 		})
 		.then((tickets) => {
 
@@ -466,56 +551,6 @@ function updateSocket(req: Request, res: Response) {
 	})
 }
 
-function endTicket(req: Request, res: Response) {
-	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { tm_end: + new Date().getTime() }).then((ticketCanceled) => {
-
-		if (ticketCanceled?.id_session) {
-			let idSession = ticketCanceled.id_session;
-			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
-			TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(sessionCanceled => {
-
-				let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
-
-				if (!sessionCanceled) {
-					return;
-				}
-
-				// en una sesión de mesa puedo tener asignadas una o mas mesas
-				for (let idTable of sessionCanceled?.id_table) {
-					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
-						server.io.to(ticketCanceled.id_company).emit('update-waiters');
-
-						return res.status(200).json({
-							ok: true,
-							msg: "Ticket finalizado correctamente",
-							ticket: ticketCanceled
-						})
-					}).catch(() => {
-						return res.status(400).json({
-							ok: false,
-							msg: "No se pudo habilitar la mesa",
-							ticket: null
-						})
-					})
-				}
-			}).catch(() => {
-				return res.status(400).json({
-					ok: false,
-					msg: "No se pudo cancelar la sesion de mesa",
-					ticket: null
-				})
-			})
-		}
-
-	}).catch(() => {
-		return res.status(400).json({
-			ok: false,
-			msg: "No se pudo finalizar el ticket",
-			ticket: null
-		})
-	})
-}
 
 // todo: metodo de asignación de mesas requeridas assignTicket() luego debe hacer un push.
 
@@ -538,7 +573,7 @@ let spmPush = (ticket: Ticket) => {
 
 		if (idleTables.length > 0) {
 			let session = new TableSession();
-			session.id_table = idleTables[0]._id;
+			session.id_tables = idleTables[0]._id;
 			session.id_ticket = ticket._id;
 			session.tm_start = + new Date();
 			session.save().then(sessionSaved => {
@@ -557,6 +592,10 @@ let spmPush = (ticket: Ticket) => {
 	})
 }
 
+// fue asignado por waiter intenta tomar las asignables. 
+let waiterPush = (ticket: Ticket) => {
+
+}
 
 export = {
 	createTicket,
@@ -567,5 +606,6 @@ export = {
 	endTicket,
 	readTickets,
 	updateSocket,
-	spmPush
+	spmPush,
+	waiterPush
 }
