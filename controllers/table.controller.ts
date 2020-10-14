@@ -143,25 +143,20 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
             tableDB.save().then(async statusSaved => {
 
-                let msg: string;
-                if (statusSaved.tx_status === 'idle') {
-                    msg = await spmPull(tableDB);
-                } else {
-                    msg = 'La mesa fue pausada correctamente'
-                }
+                let spm = await spmPull(tableDB);
 
                 if (sectionDB) {
                     const server = Server.instance;
                     server.io.to(sectionDB.id_company).emit('update-waiters');
                     server.io.to(sectionDB.id_company).emit('update-clients');
-
                 }
 
                 return res.status(200).json({
                     ok: true,
-                    msg: 'El nuevo estado de mesa fue guardado',
-                    table: statusSaved
+                    msg: spm.status,
+                    table: spm.table
                 })
+
             }).catch(() => {
                 return res.status(500).json({
                     ok: false,
@@ -191,7 +186,7 @@ let assignTables = (req: Request, res: Response) => {
         server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
         server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
-        if(blProvide){
+        if (blProvide) {
             Table.find({
                 id_section: ticketSaved.id_section,
                 nm_table: { $in: cdTables }
@@ -248,10 +243,14 @@ let deleteTable = (req: Request, res: Response) => {
     })
 }
 
-let spmPull = (table: Table): Promise<string> => {
+interface spmPullResponse {
+    status: string, // status of table
+    table: Table | null
+}
+let spmPull = (table: Table): Promise<spmPullResponse> => {
     // cuando se libera una mesa verifica el estado del primero en la lista, si es 'assigned' y la mesa le corresponde 
     // la mesa queda reservada, sino busca el próximo 'queued' que cumpla con las condiciones de la mesa.
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const server = Server.instance;
         let year = + new Date().getFullYear();
         let month = + new Date().getMonth();
@@ -269,7 +268,7 @@ let spmPull = (table: Table): Promise<string> => {
 
             let ticket: Ticket;
             ticket = ticketsDB[0];
-            if (!ticket) { return resolve('Mesa liberada. No hay clientes para esta mesa') }
+            if (!ticket) { return resolve({ status: 'idle', table: table }) }
 
             // Se comienza a reservar mesas de un requerido SOLO CUANDO se encuentra en la PRIMERA posición y la mesa liberada le corresponde
             if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
@@ -281,10 +280,10 @@ let spmPull = (table: Table): Promise<string> => {
                         if (resp) {
                             server.io.to(ticket.id_company).emit('update-waiters');
                             server.io.to(ticket.id_company).emit('update-clients');
-                            resolve('Mesa aprovisionada correctamente')
+                            resolve({ status: resp.status, table: resp.table })
                         }
                     }).catch(() => {
-                        resolve('Error al aprovisionar la mesa')
+                        reject()
                     })
                 })
             } else {
@@ -293,29 +292,39 @@ let spmPull = (table: Table): Promise<string> => {
                     if (resp) {
                         server.io.to(ticket.id_company).emit('update-waiters');
                         server.io.to(ticket.id_company).emit('update-clients');
-                        resolve('Mesa aprovisionada correctamente')
+                        resolve({ status: resp.status, table: resp.table })
+
                     }
                 }).catch(() => {
-                    resolve('Error al aprovisionar la mesa')
+                    reject()
                 })
             }
         })
     })
 }
 
-let spmProvide = (tables: Table[], ticket: Ticket): Promise<Boolean> => {
+interface spmProvideResponse {
+    status: string, // status of table
+    table: Table | null
+}
+let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> => {
     return new Promise((resolve, reject) => {
 
-        for (let table of tables) {
-            if (table.tx_status === 'idle') {
-                table.tx_status = 'reserved';
-                table.save().then(() => console.log('La mesa contigua libre fue reservada'))
+        let allReserved = false;
+        if (ticket.tx_status === 'assigned') {
+            for (let table of tables) {
+                if (table.tx_status === 'idle') {
+                    table.tx_status = 'reserved';
+                    table.save().then(() => {
+                        resolve({ status: 'reserved', table: table });
+                    })
+                }
             }
+            let tablesReserved = tables.filter(table => table.tx_status === 'reserved').length;
+            if (tablesReserved === ticket.cd_tables?.length) { allReserved = true; }
         }
 
-        let tablesReserved = tables.filter(table => table.tx_status === 'reserved')
-
-        if (tablesReserved.length === ticket.cd_tables?.length) {
+        if ((ticket.tx_status === 'assigned' && allReserved) || (ticket.tx_status === 'queued')) {
 
             let session = new TableSession();
             let idTables: string[] = tables.map(table => table._id);
@@ -331,7 +340,7 @@ let spmProvide = (tables: Table[], ticket: Ticket): Promise<Boolean> => {
                         ticket.id_session = sessionSaved._id;
                         ticket.tm_provided = + new Date();
                         ticket.save().then(ticketSaved => {
-                            return resolve(true);
+                            return resolve({ status: 'busy', table });
                         }).catch(() => reject(false))
                     })
                 }

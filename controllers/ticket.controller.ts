@@ -380,20 +380,19 @@ function createTicket(req: Request, res: Response) {
 				tm_end: null
 			})
 
-			ticket.save().then((ticketSaved) => {
-
+			ticket.save().then(async (ticketSaved) => {
 
 				// SPM: Sistema de Provisión de mesas
-				spmPush(ticket);
+				let spm = await spmPush(ticket);
 
 				const server = Server.instance;
 				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
-				res.status(201).json({
+				return res.status(201).json({
 					ok: true,
-					msg: "Ticket guardado correctamente.",
-					ticket: ticketSaved
+					msg: spm.status,
+					ticket: spm.ticket
 				});
 
 			}).catch((err) => {
@@ -464,7 +463,7 @@ function readTickets(req: Request, res: Response) {
 	})
 		.populate({
 			path: 'id_session id_section',
-			populate: { path: '[id_tables]' }
+			populate: { path: 'id_tables' }
 		})
 		.then((tickets) => {
 
@@ -555,39 +554,57 @@ function updateSocket(req: Request, res: Response) {
 // todo: metodo de asignación de mesas requeridas assignTicket() luego debe hacer un push.
 
 // nuevo ticket (push)
-let spmPush = (ticket: Ticket) => {
+interface spmPushResponse {
+	status: string, // status of ticket
+	ticket: Ticket | null
+}
 
-	Table.find({
-		nm_persons: { $gte: ticket.nm_persons },
-		id_section: ticket.id_section
-	}).then(candidateTablesDB => {
+let spmPush = (ticket: Ticket): Promise<spmPushResponse> => {
 
-		// no existen mesas para esta solicitud -> 'requested'
-		if (candidateTablesDB.length === 0) {
-			Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then(() => {
-				return;
-			})
-		}
+	return new Promise((resolve, reject) => {
 
-		let idleTables = candidateTablesDB.filter(table => table.tx_status === 'idle');
+		Table.find({
+			nm_persons: { $gte: ticket.nm_persons },
+			id_section: ticket.id_section
+		}).then(candidateTablesDB => {
 
-		if (idleTables.length > 0) {
-			let session = new TableSession();
-			session.id_tables = idleTables[0]._id;
-			session.id_ticket = ticket._id;
-			session.tm_start = + new Date();
-			session.save().then(sessionSaved => {
-				idleTables[0].tx_status = 'busy';
-				idleTables[0].id_session = sessionSaved._id;
-				idleTables[0].save().then(tableSaved => {
-					ticket.tx_status = 'provided';
-					ticket.id_session = sessionSaved._id;
-					ticket.tm_provided = + new Date();
-					ticket.save().then(ticketSaved => {
+			// no existen mesas para esta solicitud -> 'requested'
+			if (candidateTablesDB.length === 0) {
+				Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then((ticketRequested) => {
+					resolve({ status: 'requested', ticket: ticketRequested })
+					return;
+				})
+			}
+
+			// existen mesas para la solicitud verifico disponibilidad
+			let idleTables = candidateTablesDB.filter(table => table.tx_status === 'idle');
+
+			if (idleTables.length === 0) {
+				// no hay disponibilidad queda en cola
+				resolve({ status: 'queued', ticket: ticket })
+			} else {
+				// hay disponibilidad se aprovisiona
+				let session = new TableSession();
+				session.id_tables = idleTables[0]._id;
+				session.id_ticket = ticket._id;
+				session.tm_start = + new Date();
+				session.save().then(sessionSaved => {
+					idleTables[0].tx_status = 'busy';
+					idleTables[0].id_session = sessionSaved._id;
+					idleTables[0].save().then(tableSaved => {
+						ticket.tx_status = 'provided';
+						ticket.id_session = sessionSaved._id;
+						ticket.tm_provided = + new Date();
+						ticket.save().then(ticketProvided => {
+							resolve({ status: 'provided', ticket: ticketProvided })
+						})
 					})
 				})
-			})
-		}
+			}
+
+		}).catch(() => {
+			reject()
+		})
 
 	})
 }
