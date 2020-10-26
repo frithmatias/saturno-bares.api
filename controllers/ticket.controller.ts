@@ -170,9 +170,9 @@ function reassignTicket(req: Request, res: Response) {
 function attendedTicket(req: Request, res: Response) {
 
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { bl_called: false, tm_att: + new Date().getTime() }, { new: true }).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_att: + new Date().getTime() }, { new: true }).then(ticketAttended => {
 
-		if (ticketAttended?.bl_called === false) {
+		if (ticketAttended) {
 
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
 			server.io.to(ticketAttended.id_socket_client).emit('update-clients');
@@ -369,7 +369,7 @@ function createTicket(req: Request, res: Response) {
 				id_session: null,
 				nm_persons: nmPersons,
 				bl_priority: blPriority,
-				bl_called: true,
+				tx_call: null,
 				tx_status: 'queued',
 				id_position: idPosition,
 				id_socket_client: idSocket,
@@ -425,11 +425,11 @@ function createTicket(req: Request, res: Response) {
 };
 
 function callWaiter(req: Request, res: Response) {
+	const { idTicket, txCall } = req.body;
 
-	const idTicket = req.params.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { bl_called: true }, { new: true }).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { tx_call: txCall }, { new: true }).then(ticketAttended => {
 
-		if (ticketAttended?.bl_called === true) {
+		if (ticketAttended) {
 
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
 
@@ -594,6 +594,7 @@ let spmPush = (ticket: Ticket): Promise<spmPushResponse> => {
 					idleTables[0].save().then(tableSaved => {
 						ticket.tx_status = 'provided';
 						ticket.id_session = sessionSaved._id;
+						ticket.tx_call = 'card'; // pide la carta
 						ticket.tm_provided = + new Date();
 						ticket.save().then(ticketProvided => {
 							resolve({ status: 'provided', ticket: ticketProvided })

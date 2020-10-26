@@ -5,7 +5,7 @@ const tableSessionSchema = new Schema({
     id_ticket: {type: String, ref: 'Ticket', required: false },
     tm_start: {type: Number, required: true, default: + new Date().getTime()},
     tm_end: {type: Number, required: false, default: null},
-},{ collection: "tableSessions" })
+},{ collection: "table.sessions" })
 
 export interface TableSession extends Document {
     id_tables: string[]; 

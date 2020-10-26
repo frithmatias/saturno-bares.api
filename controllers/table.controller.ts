@@ -144,7 +144,6 @@ let toggleTableStatus = (req: Request, res: Response) => {
             tableDB.save().then(async statusSaved => {
 
                 let spm = await spmPull(tableDB);
-
                 if (sectionDB) {
                     const server = Server.instance;
                     server.io.to(sectionDB.id_company).emit('update-waiters');
@@ -307,6 +306,7 @@ interface spmProvideResponse {
     status: string, // status of table
     table: Table | null
 }
+
 let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> => {
     return new Promise((resolve, reject) => {
 

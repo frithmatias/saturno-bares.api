@@ -6,7 +6,7 @@ const ticketsSchema = new Schema({
     id_session: {type: String, ref: 'TableSession', required: false, default: null},
     nm_persons: {type: Number, required: [true, 'El nm_persons es necesario']},
     bl_priority: {type: Boolean, required: true, default: false},
-    bl_called: {type: Boolean, required: true, default: true},
+    tx_call: {type: String, required: false, default: null},
     tx_status: {type: String, required: [true, 'El tx_status es necesario'], default: 'queued'},
     cd_tables: {type: [Number], required: false}, // only for requested and assigned tickets
     id_position: {type: Number, required: [true, 'El id_position es necesario']},
@@ -24,7 +24,7 @@ export interface Ticket extends Document {
     id_session?: string | null; // requested 
     nm_persons: number; // requested
     bl_priority: boolean; // requested
-    bl_called: boolean;
+    tx_call: string | null;
     tx_status: string; // assigned [provided, assigned, queued, requested]
     cd_tables?: [number]; // only for requested and assigned tickets
     id_position: number; // assigned
