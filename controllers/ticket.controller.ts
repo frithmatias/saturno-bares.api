@@ -170,7 +170,7 @@ function reassignTicket(req: Request, res: Response) {
 function attendedTicket(req: Request, res: Response) {
 
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_att: + new Date().getTime() }, { new: true }).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null, tm_att: + new Date() }, { new: true }).then(ticketAttended => {
 
 		if (ticketAttended) {
 
@@ -265,7 +265,8 @@ function endTicket(req: Request, res: Response) {
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
 			TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(sessionCanceled => {
-				let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
+				// let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
+				let new_status = 'paused';
 				if (!sessionCanceled) {
 					return;
 				}
@@ -370,6 +371,7 @@ function createTicket(req: Request, res: Response) {
 				nm_persons: nmPersons,
 				bl_priority: blPriority,
 				tx_call: null,
+				tm_call: null,
 				tx_status: 'queued',
 				id_position: idPosition,
 				id_socket_client: idSocket,
@@ -427,7 +429,7 @@ function createTicket(req: Request, res: Response) {
 function callWaiter(req: Request, res: Response) {
 	const { idTicket, txCall } = req.body;
 
-	Ticket.findByIdAndUpdate(idTicket, { tx_call: txCall }, { new: true }).then(ticketAttended => {
+	Ticket.findByIdAndUpdate(idTicket, { tx_call: txCall, tm_call: + new Date() }, { new: true }).then(ticketAttended => {
 
 		if (ticketAttended) {
 
@@ -495,7 +497,6 @@ function updateSocket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 	const newSocket = req.body.newSocket;
 	const isClient = req.body.isClient;
-
 	Ticket.findById(idTicket).then((ticketDB) => {
 
 		if (!ticketDB) {
@@ -595,6 +596,7 @@ let spmPush = (ticket: Ticket): Promise<spmPushResponse> => {
 						ticket.tx_status = 'provided';
 						ticket.id_session = sessionSaved._id;
 						ticket.tx_call = 'card'; // pide la carta
+						ticket.tm_call = + new Date();
 						ticket.tm_provided = + new Date();
 						ticket.save().then(ticketProvided => {
 							resolve({ status: 'provided', ticket: ticketProvided })

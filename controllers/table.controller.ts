@@ -135,26 +135,31 @@ let toggleTableStatus = (req: Request, res: Response) => {
             })
         } else {
 
-            if (tableDB.tx_status === 'paused' || tableDB.tx_status === 'reserved') {
-                tableDB.tx_status = 'idle';
-            } else if (tableDB.tx_status === 'idle') {
-                tableDB.tx_status = 'paused';
-            }
+            tableDB.tx_status = tableDB.tx_status === 'idle' ? 'paused' : 'idle';
 
             tableDB.save().then(async statusSaved => {
 
-                let spm = await spmPull(tableDB);
-                if (sectionDB) {
-                    const server = Server.instance;
-                    server.io.to(sectionDB.id_company).emit('update-waiters');
-                    server.io.to(sectionDB.id_company).emit('update-clients');
-                }
+                if (tableDB.tx_status !== 'idle') {
+                    return res.status(200).json({
+                        ok: true,
+                        msg: 'busy',
+                        table: tableDB
+                    })
+                } 
+                    let spm = await spmPull(tableDB);
 
-                return res.status(200).json({
-                    ok: true,
-                    msg: spm.status,
-                    table: spm.table
-                })
+                    if (sectionDB) {
+                        const server = Server.instance;
+                        server.io.to(sectionDB.id_company).emit('update-waiters');
+                        server.io.to(sectionDB.id_company).emit('update-clients');
+                    }
+    
+                    return res.status(200).json({
+                        ok: true,
+                        msg: spm.status,
+                        table: spm.table
+                    })
+
 
             }).catch(() => {
                 return res.status(500).json({
