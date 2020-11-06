@@ -175,8 +175,9 @@ let toggleTableStatus = (req: Request, res: Response) => {
 }
 
 let assignTables = (req: Request, res: Response) => {
-    var { idTicket, cdTables, blProvide } = req.body;
-    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: 'assigned' }, { new: true }).then(ticketSaved => {
+    var { idTicket, cdTables, blPriority } = req.body;
+
+    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: 'assigned', bl_priority: blPriority }, { new: true }).then(ticketSaved => {
 
         if (!ticketSaved) {
             return res.status(400).json({
@@ -190,7 +191,7 @@ let assignTables = (req: Request, res: Response) => {
         server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
         server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
-        if (blProvide) {
+        if (blPriority) {
             Table.find({
                 id_section: ticketSaved.id_section,
                 nm_table: { $in: cdTables }
@@ -251,6 +252,7 @@ interface spmPullResponse {
     status: string, // status of table
     table: Table | null
 }
+
 let spmPull = (table: Table): Promise<spmPullResponse> => {
     // cuando se libera una mesa verifica el estado del primero en la lista, si es 'assigned' y la mesa le corresponde 
     // la mesa queda reservada, sino busca el próximo 'queued' que cumpla con las condiciones de la mesa.
@@ -274,8 +276,12 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
             ticket = ticketsDB[0];
             if (!ticket) { return resolve({ status: 'idle', table: table }) }
 
-            // Se comienza a reservar mesas de un requerido SOLO CUANDO se encuentra en la PRIMERA posición y la mesa liberada le corresponde
-            if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
+            // secuencia en prioridad de asignación: 1.priority true, 2.assigned, 3.queued
+            let ticketPriority = ticketsDB.filter(ticket => ticket.bl_priority === true)[0];
+            if(ticketPriority){
+
+            } else if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
+                // Se comienza a reservar mesas de un requerido SOLO CUANDO se encuentra en la PRIMERA posición y la mesa liberada le corresponde
                 Table.find({
                     id_section: table.id_section,
                     nm_table: { $in: ticket.cd_tables }
@@ -297,7 +303,6 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
                         server.io.to(ticket.id_company).emit('update-waiters');
                         server.io.to(ticket.id_company).emit('update-clients');
                         resolve({ status: resp.status, table: resp.table })
-
                     }
                 }).catch(() => {
                     reject()
@@ -315,6 +320,7 @@ interface spmProvideResponse {
 let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> => {
     return new Promise((resolve, reject) => {
 
+        // se reservan las mesas disponibles (idle)
         let allReserved = false;
         if (ticket.tx_status === 'assigned') {
             for (let table of tables) {
@@ -325,8 +331,8 @@ let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> 
                     })
                 }
             }
-            let tablesReserved = tables.filter(table => table.tx_status === 'reserved').length;
-            if (tablesReserved === ticket.cd_tables?.length) { allReserved = true; }
+            let tablesReservedCount = tables.filter(table => table.tx_status === 'reserved').length;
+            if (tablesReservedCount === ticket.cd_tables?.length) { allReserved = true; }
         }
 
         if ((ticket.tx_status === 'assigned' && allReserved) || (ticket.tx_status === 'queued')) {
@@ -349,7 +355,6 @@ let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> 
                         }).catch(() => reject(false))
                     })
                 }
-
             })
         }
     })

@@ -143,15 +143,11 @@ function reassignTicket(req: Request, res: Response) {
 
 				})
 			}).catch(() => {
-
 				return res.status(400).json({
 					ok: false,
 					msg: "Error al procesar el status de los tickets para la empresa."
 				});
-
 			})
-
-
 		}).catch(() => {
 			return res.status(400).json({
 				ok: false,
@@ -159,32 +155,21 @@ function reassignTicket(req: Request, res: Response) {
 				ticket: null
 			})
 		})
-
-
 	})
-
-
-
 };
 
 function attendedTicket(req: Request, res: Response) {
-
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null, tm_att: + new Date() }, { new: true }).then(ticketAttended => {
-
+	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null }, { new: true }).then(ticketAttended => {
 		if (ticketAttended) {
-
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
 			server.io.to(ticketAttended.id_socket_client).emit('update-clients');
-
 			return res.status(200).json({
 				ok: true,
 				msg: 'El llamado al camarero fue atendido.',
 				ticket: ticketAttended
 			})
-
 		}
-
 	}).catch(() => {
 		return res.status(400).json({
 			ok: false,
