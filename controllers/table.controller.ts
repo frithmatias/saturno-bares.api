@@ -125,7 +125,6 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
     Table.findById(idTable).then(async tableDB => {
 
-        let sectionDB = await Section.findById(tableDB?.id_section);
 
         if (!tableDB) {
             res.status(400).json({
@@ -134,6 +133,20 @@ let toggleTableStatus = (req: Request, res: Response) => {
                 table: null
             })
         } else {
+
+            let sectionDB = await Section.findById(tableDB?.id_section);
+
+            if (!sectionDB) {
+                res.status(400).json({
+                    ok: false,
+                    msg: 'No existe la mesa',
+                    table: null
+                })
+            } else {
+                const server = Server.instance;
+                server.io.to(sectionDB.id_company).emit('update-waiters');
+                server.io.to(sectionDB.id_company).emit('update-clients');
+            }
 
             tableDB.tx_status = tableDB.tx_status === 'idle' ? 'paused' : 'idle';
 
@@ -145,20 +158,15 @@ let toggleTableStatus = (req: Request, res: Response) => {
                         msg: 'busy',
                         table: tableDB
                     })
-                } 
-                    let spm = await spmPull(tableDB);
+                }
+                let spm = await spmPull(tableDB);
 
-                    if (sectionDB) {
-                        const server = Server.instance;
-                        server.io.to(sectionDB.id_company).emit('update-waiters');
-                        server.io.to(sectionDB.id_company).emit('update-clients');
-                    }
-    
-                    return res.status(200).json({
-                        ok: true,
-                        msg: spm.status,
-                        table: spm.table
-                    })
+
+                return res.status(200).json({
+                    ok: true,
+                    msg: spm.status,
+                    table: spm.table
+                })
 
 
             }).catch(() => {
@@ -177,7 +185,8 @@ let toggleTableStatus = (req: Request, res: Response) => {
 let assignTables = (req: Request, res: Response) => {
     var { idTicket, cdTables, blPriority } = req.body;
 
-    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: 'assigned', bl_priority: blPriority }, { new: true }).then(ticketSaved => {
+    let txStatus = cdTables.length > 0 ? 'assigned' : 'requested';
+    Ticket.findByIdAndUpdate(idTicket, { cd_tables: cdTables, tx_status: txStatus, bl_priority: blPriority }, { new: true }).then(ticketSaved => {
 
         if (!ticketSaved) {
             return res.status(400).json({
@@ -276,12 +285,34 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
             ticket = ticketsDB[0];
             if (!ticket) { return resolve({ status: 'idle', table: table }) }
 
-            // secuencia en prioridad de asignación: 1.priority true, 2.assigned, 3.queued
+            // secuencia en prioridad de asignación: 
+            // 1. 'assigned' con priority true, 
+            // 2. 'assigned' con priority false, 
+            // 3. queued
+            
+            // busco en toda la cola un prioritario
             let ticketPriority = ticketsDB.filter(ticket => ticket.bl_priority === true)[0];
-            if(ticketPriority){
+            if (ticketPriority) {
+                Table.find({
+                    id_section: table.id_section,
+                    nm_table: { $in: ticketPriority.cd_tables }
+                }).then(tablesAssigned => {
+                    spmProvide(tablesAssigned, ticketPriority).then((resp) => {
+                        if (resp) {
+                            server.io.to(ticketPriority.id_company).emit('update-waiters');
+                            server.io.to(ticketPriority.id_company).emit('update-clients');
+                            resolve({ status: resp.status, table: resp.table })
+                        }
+                    }).catch(() => {
+                        reject()
+                    })
+                })
+            } 
 
-            } else if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
-                // Se comienza a reservar mesas de un requerido SOLO CUANDO se encuentra en la PRIMERA posición y la mesa liberada le corresponde
+            // Se comienza a reservar mesas de un requerido asignado SOLO cuando se encuentra en la PRIMERA posición 
+            // y la mesa liberada le corresponde
+            else if (ticket?.tx_status === 'assigned' && ticket?.cd_tables?.includes(table.nm_table)) {
+                // obtengo las mesas asignadas
                 Table.find({
                     id_section: table.id_section,
                     nm_table: { $in: ticket.cd_tables }
@@ -296,7 +327,11 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
                         reject()
                     })
                 })
-            } else {
+            } 
+            
+            // Si NO existe un ticket prioritario y el próximo en la cola NO es un asignado, 
+            // entonces busco el primer ticket 'queued' que le sirva la mesa
+            else {
                 ticket = ticketsDB.filter(ticket => ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)[0];
                 spmProvide([table], ticket).then((resp) => {
                     if (resp) {
