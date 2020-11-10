@@ -13,8 +13,7 @@ function createSection(req: Request, res: Response) {
 
     var section = new Section({
         id_company: body.id_company,
-        tx_section: body.tx_section,
-        id_session: null
+        tx_section: body.tx_section
     });
 
     section.save().then((sectionSaved) => {
@@ -99,121 +98,119 @@ function readSections(req: Request, res: Response) {
         })
 }
 
-function deleteSection(req: Request, res: Response) {
-    let idSection = req.params.idSection;
-    Section.findByIdAndDelete(idSection).then((sectionDeleted) => {
-        res.status(200).json({
-            ok: true,
-            msg: 'Escritorio eliminado correctamente',
-            section: sectionDeleted
-        })
-    }).catch(() => {
-        res.status(400).json({
-            ok: false,
-            msg: 'Error al eliminar el escritorio',
-            section: null
-        })
-    })
-}
+function readSessions(req: Request, res: Response) {
+    let idCompany = req.params.idCompany;
 
-function takeSection(req: Request, res: Response) {
+    Section.find({ id_company: idCompany })
+        .then(sectionsDB => {
+            return sectionsDB.map(section => section._id);
+        }).then(resp => {
 
-    let idSection = req.body.idSection;
-    let idWaiter = req.body.idWaiter;
-    // actualizo el estado del escritorio
-    var session = new sectionSession({
-        id_section: idSection,
-        id_waiter: idWaiter,
-        tm_start: + new Date().getTime(),
-        tm_end: null
-    });
+            sectionSession.find({ id_section: { $in: resp }, tm_end: null}).populate('id_section').then(sessionsDB => {
 
-    session.save().then(sessionSaved => {
-
-        // actualizo el escritorio
-        Section.findByIdAndUpdate(idSection, { id_session: sessionSaved._id }, { new: true })
-            .populate({
-                path: 'id_session',
-                populate: { path: 'id_waiter id_section' }
-            })
-            .then(sectionTaked => {
+                if (!resp) {
+                    return res.status(400).json({
+                        ok: false,
+                        msg: 'No existen sesiones para la empresa seleccionada',
+                        sessions: null
+                    })
+                }
 
                 return res.status(200).json({
                     ok: true,
-                    msg: 'Se asigno el asistente al escritorio',
-                    section: sectionTaked
-                });
+                    msg: 'Sesiones obtenidas correctamente',
+                    sessions: sessionsDB
+                })
 
             }).catch(() => {
                 return res.status(500).json({
                     ok: false,
-                    msg: 'Error al registrar la sesión en el escritorio',
-                    section: null
-                });
+                    msg: 'Error al consultar las sesiones para las empresa solicitada',
+                    sessions: null
+                })
+
             })
+        })
+    }
+
+function deleteSection(req: Request, res: Response) {
+                let idSection = req.params.idSection;
+                Section.findByIdAndDelete(idSection).then((sectionDeleted) => {
+                    res.status(200).json({
+                        ok: true,
+                        msg: 'Escritorio eliminado correctamente',
+                        section: sectionDeleted
+                    })
+                }).catch(() => {
+                    res.status(400).json({
+                        ok: false,
+                        msg: 'Error al eliminar el escritorio',
+                        section: null
+                    })
+                })
+            }
+
+function takeSection(req: Request, res: Response) {
+
+                let idSection = req.body.idSection;
+                let idWaiter = req.body.idWaiter;
+
+                // actualizo el estado del escritorio
+                var session = new sectionSession({
+                    id_section: idSection,
+                    id_waiter: idWaiter,
+                    tm_start: + new Date().getTime(),
+                    tm_end: null
+                });
+
+                session.save().then(sessionSaved => {
+                    return res.status(200).json({
+                        ok: true,
+                        msg: 'Se creo la sesión de camarero correctamente',
+                        session: sessionSaved
+                    });
+                }).catch(() => {
+                    return res.status(500).json({
+                        ok: false,
+                        msg: 'Error al guardar la sesion del camarero',
+                        session: null
+                    });
+                });
 
 
-    }).catch(() => {
-        return res.status(500).json({
-            ok: false,
-            msg: 'Error al guardar la sesion del escritorio',
-            table: null
-        });
-    });
 
 
-
-
-}
+            }
 
 function releaseSection(req: Request, res: Response) {
+                let idSection = req.body.idSection;
+                let idWaiter = req.body.idWaiter;
 
-    let idSection = req.body.idSection;
-
-    Section.findByIdAndUpdate(idSection, { id_session: null }).then(tableUpdated => {
-
-        if (!tableUpdated) {
-            return res.status(400).json({
-                ok: false,
-                msg: 'No existe el escritorio que se desea finalizar',
-                table: null
-            })
-        }
-
-        sectionSession.findByIdAndUpdate(tableUpdated.id_session,
-            { tm_end: + new Date().getTime() }).then(tableReleased => {
-
-                return res.status(200).json({
-                    ok: true,
-                    msg: 'Esctirorio finalizado correctamente',
-                    table: tableReleased
+                sectionSession.findOne({ id_section: idSection, id_waiter: idWaiter, tm_end: null }).then(sessionToClose => {
+                    if (!sessionToClose) {
+                        return res.status(400).json({
+                            ok: false,
+                            msg: 'No existe la sesión que desea cerrar',
+                            session: null
+                        })
+                    }
+                    sessionToClose.tm_end = + new Date().getTime();
+                    sessionToClose.save().then((sessionSaved) => {
+                        return res.status(200).json({
+                            ok: true,
+                            msg: 'Sesión cerrada correctamente',
+                            session: sessionSaved
+                        })
+                    })
                 })
-
-            }).catch(() => {
-                return res.status(400).json({
-                    ok: true,
-                    msg: 'Error al guardar la sesion del escritorio',
-                    table: null
-                })
-            })
-
-
-    }).catch(() => {
-        return res.status(500).json({
-            ok: false,
-            msg: 'Error al buscar el escritorio a finalizar',
-            table: null
-        })
-    })
-
-
-}
+            }
 
 export = {
-    createSection,
-    readSectionsUser,
-    readSections,
-    deleteSection,
-    takeSection,
-    releaseSection
-}
+        createSection,
+        readSectionsUser,
+        readSections,
+        readSessions,
+        deleteSection,
+        takeSection,
+        releaseSection
+    }
