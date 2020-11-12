@@ -10,9 +10,10 @@ let verificaToken = (req: any, res: Response, next: NextFunction) => {
             next(); 
         })
         .catch((err) => {
-            res.json({
+            res.status(401).json({
                 ok: false,
-                msg: 'Token incorrecto'
+                msg: 'La sesión expiró, inice sesión nuevamente.',
+                code: 1001
             });
         });
 };
@@ -31,7 +32,7 @@ let canUpdate = (req: any, res: Response, next: NextFunction) => {
       return res.status(401).json({
         //401 UNAUTHORIZED
         ok: false,
-        msg: "Token Incorrecto - el role no es ADMIN_ROLE"
+        msg: "No tiene los permisos necesarios."
       });
     }
   };

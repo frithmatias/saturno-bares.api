@@ -30,7 +30,7 @@ function getUserMetrics(req: Request, res: Response) {
                 if (ticketsDB.length === 0) {
                     return res.status(200).json({
                         ok: false,
-                        msg: 'No existen tickets del asistente',
+                        msg: 'No existen tickets del camarero',
                         metrics: { tickets: ticketsDB, total: 0, avg: 0 }
                     })
                 }
@@ -45,7 +45,7 @@ function getUserMetrics(req: Request, res: Response) {
 
                     return res.status(200).json({
                         ok: true,
-                        msg: 'Metricas del asistente obtenidas correctamente',
+                        msg: 'Metricas del camarero obtenidas correctamente',
                         metrics: { tickets: ticketsDB, total: scoresDB[0].total, avg: scoresDB[0].avg }
                     })
 
@@ -60,7 +60,7 @@ function getUserMetrics(req: Request, res: Response) {
             }).catch(() => {
                 return res.status(400).json({
                     ok: false,
-                    msg: 'Error al obtener los tickets del asistente',
+                    msg: 'Error al obtener los tickets del camarero',
                     tickets: null
                 })
             })
@@ -75,13 +75,13 @@ function getTableSessions(req: Request, res: Response) {
         .then(ticketsDB => {
             return res.status(200).json({
                 ok: true,
-                msg: 'Tickets del asistente obtenidos correctamente',
+                msg: 'Tickets del camarero obtenidos correctamente',
                 tickets: ticketsDB
             })
         }).catch(() => {
             return res.status(400).json({
                 ok: false,
-                msg: 'Error al obtener los tickets del asistente',
+                msg: 'Error al obtener los tickets del camarero',
                 tickets: null
             })
         })

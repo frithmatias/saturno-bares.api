@@ -61,7 +61,7 @@ let readTables = (req: Request, res: Response) => {
                     if (!tablesDB) {
                         return res.status(400).json({
                             ok: false,
-                            msg: 'No existen escritorios para la empresa seleccionada',
+                            msg: 'No existen mesas para la empresa seleccionada',
                             tables: null
                         })
                     }
@@ -86,37 +86,6 @@ let readTables = (req: Request, res: Response) => {
             })
 
         })
-}
-
-let readSectionTables = (req: Request, res: Response) => {
-    let idSection = req.params.idSection;
-    Table.find({ id_section: idSection })
-        .populate({
-            path: 'id_session',
-            populate: { path: 'id_ticket' }
-        })
-        .then(tablesDB => {
-            if (!tablesDB) {
-                return res.status(400).json({
-                    ok: false,
-                    msg: 'No existen escritorios para la empresa seleccionada',
-                    tables: null
-                })
-            }
-            return res.status(200).json({
-                ok: true,
-                msg: 'Mesas obtenidas correctamente',
-                tables: tablesDB
-            })
-        }).catch(() => {
-            return res.status(500).json({
-                ok: false,
-                msg: 'Error al consultar las mesas para los sectores de la empresa.',
-                tables: null
-            })
-
-        })
-
 }
 
 let toggleTableStatus = (req: Request, res: Response) => {
@@ -251,7 +220,7 @@ let deleteTable = (req: Request, res: Response) => {
     }).catch(() => {
         res.status(400).json({
             ok: false,
-            msg: 'Error al eliminar el escritorio',
+            msg: 'Error al eliminar la mesa',
             table: null
         })
     })
@@ -398,7 +367,6 @@ let spmProvide = (tables: Table[], ticket: Ticket): Promise<spmProvideResponse> 
 export = {
     createTable,
     readTables,
-    readSectionTables,
     toggleTableStatus,
     assignTables,
     deleteTable,

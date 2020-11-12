@@ -5,7 +5,7 @@ const sectionSessionSchema = new Schema({
     id_waiter: { type: String, ref: 'User', required: [true, 'El ID del camarero es necesario'] },
     tm_start: { type: Number, required: true, default: + new Date().getTime() },
     tm_end: { type: Number, required: false, default: null },
-}, { collection: "sessions" })
+}, { collection: "section.session" })
 
 // middleware: populate section after save session
 sectionSessionSchema.post('save', function (doc, next) {

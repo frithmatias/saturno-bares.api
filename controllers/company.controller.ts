@@ -25,14 +25,14 @@ function createCompany(req: Request, res: Response) {
 
     return res.status(200).json({
       ok: true,
-      msg: 'Empresa creada correctamente',
+      msg: 'Comercio creado correctamente',
       company: companySaved
     })
 
   }).catch((err) => {
     return res.status(400).json({
       ok: false,
-      msg: 'Error al guardar el escritorio por defecto',
+      msg: 'Error al guardar el comercio',
       company: null
     })
   })

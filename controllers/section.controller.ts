@@ -31,41 +31,6 @@ function createSection(req: Request, res: Response) {
     })
 }
 
-function readSectionsUser(req: Request, res: Response) {
-    let idUser = req.params.idUser;
-
-    Company.find({ id_user: idUser }).then(companiesDB => {
-        return companiesDB.map(company => company._id)
-    }).then(resp => {
-        Section.find({ id_company: { $in: resp } }).populate('id_company').then(sectionsDB => {
-            if (!sectionsDB) {
-                return res.status(400).json({
-                    ok: false,
-                    msg: 'No existen escritorios para la empresa seleccionada',
-                    sections: null
-                })
-            }
-            return res.status(200).json({
-                ok: true,
-                msg: 'Escritorios obtenidos correctamente',
-                sections: sectionsDB
-            })
-        }).catch(() => {
-            return res.status(500).json({
-                ok: false,
-                msg: 'Error al consultar los escritorios para las empresas del user',
-                sections: null
-            })
-        }).catch(() => {
-            return res.status(500).json({
-                ok: false,
-                msg: 'Error al consultar las empresas del user',
-                sections: null
-            })
-        })
-    })
-}
-
 function readSections(req: Request, res: Response) {
     let idCompany = req.params.idCompany;
 
@@ -106,7 +71,7 @@ function readSessions(req: Request, res: Response) {
             return sectionsDB.map(section => section._id);
         }).then(resp => {
 
-            sectionSession.find({ id_section: { $in: resp }, tm_end: null}).populate('id_section').then(sessionsDB => {
+            sectionSession.find({ id_section: { $in: resp }, tm_end: null }).populate('id_section').then(sessionsDB => {
 
                 if (!resp) {
                     return res.status(400).json({
@@ -131,86 +96,92 @@ function readSessions(req: Request, res: Response) {
 
             })
         })
-    }
+}
 
 function deleteSection(req: Request, res: Response) {
-                let idSection = req.params.idSection;
-                Section.findByIdAndDelete(idSection).then((sectionDeleted) => {
-                    res.status(200).json({
-                        ok: true,
-                        msg: 'Escritorio eliminado correctamente',
-                        section: sectionDeleted
-                    })
-                }).catch(() => {
-                    res.status(400).json({
-                        ok: false,
-                        msg: 'Error al eliminar el escritorio',
-                        section: null
-                    })
-                })
-            }
+    let idSection = req.params.idSection;
+    Section.findByIdAndDelete(idSection).then((sectionDeleted) => {
+        res.status(200).json({
+            ok: true,
+            msg: 'Sector eliminado correctamente',
+            section: sectionDeleted
+        })
+    }).catch(() => {
+        res.status(400).json({
+            ok: false,
+            msg: 'Error al eliminar el sector',
+            section: null
+        })
+    })
+}
 
 function takeSection(req: Request, res: Response) {
 
-                let idSection = req.body.idSection;
-                let idWaiter = req.body.idWaiter;
+    let idSection = req.body.idSection;
+    let idWaiter = req.body.idWaiter;
 
-                // actualizo el estado del escritorio
-                var session = new sectionSession({
-                    id_section: idSection,
-                    id_waiter: idWaiter,
-                    tm_start: + new Date().getTime(),
-                    tm_end: null
-                });
+    sectionSession.findOne({ id_section: idSection, id_waiter: idWaiter, tm_end: null }).then(activeSession => {
+        console.log(activeSession)
+        if (activeSession) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'Usted ya tiene una sesión activa!',
+                session: activeSession
+            });
+        }
 
-                session.save().then(sessionSaved => {
-                    return res.status(200).json({
-                        ok: true,
-                        msg: 'Se creo la sesión de camarero correctamente',
-                        session: sessionSaved
-                    });
-                }).catch(() => {
-                    return res.status(500).json({
-                        ok: false,
-                        msg: 'Error al guardar la sesion del camarero',
-                        session: null
-                    });
-                });
+        var session = new sectionSession({
+            id_section: idSection,
+            id_waiter: idWaiter,
+            tm_start: + new Date().getTime(),
+            tm_end: null
+        });
 
+        session.save().then(sessionSaved => {
+            return res.status(200).json({
+                ok: true,
+                msg: 'Se creo la sesión de camarero correctamente',
+                session: sessionSaved
+            });
+        }).catch(() => {
+            return res.status(500).json({
+                ok: false,
+                msg: 'Error al guardar la sesion del camarero',
+                session: null
+            });
+        });
+    })
 
-
-
-            }
+}
 
 function releaseSection(req: Request, res: Response) {
-                let idSection = req.body.idSection;
-                let idWaiter = req.body.idWaiter;
+    let idSection = req.body.idSection;
+    let idWaiter = req.body.idWaiter;
 
-                sectionSession.findOne({ id_section: idSection, id_waiter: idWaiter, tm_end: null }).then(sessionToClose => {
-                    if (!sessionToClose) {
-                        return res.status(400).json({
-                            ok: false,
-                            msg: 'No existe la sesión que desea cerrar',
-                            session: null
-                        })
-                    }
-                    sessionToClose.tm_end = + new Date().getTime();
-                    sessionToClose.save().then((sessionSaved) => {
-                        return res.status(200).json({
-                            ok: true,
-                            msg: 'Sesión cerrada correctamente',
-                            session: sessionSaved
-                        })
-                    })
-                })
-            }
+    sectionSession.findOne({ id_section: idSection, id_waiter: idWaiter, tm_end: null }).then(sessionToClose => {
+        if (!sessionToClose) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No existe la sesión que desea cerrar',
+                session: null
+            })
+        }
+        sessionToClose.tm_end = + new Date().getTime();
+        sessionToClose.save().then((sessionSaved) => {
+            return res.status(200).json({
+                ok: true,
+                msg: 'Sesión cerrada correctamente',
+                session: sessionSaved
+            })
+        })
+    })
+}
 
 export = {
-        createSection,
-        readSectionsUser,
-        readSections,
-        readSessions,
-        deleteSection,
-        takeSection,
-        releaseSection
-    }
+    createSection,
+    readSections,
+    readSessions,
+    deleteSection,
+    takeSection,
+    releaseSection
+}

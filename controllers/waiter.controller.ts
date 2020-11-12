@@ -45,7 +45,7 @@ function readWaiters(req: Request, res: Response) {
             if (!usersDB) {
                 return res.status(400).json({
                     ok: false,
-                    msg: 'No existen asistentes para la empresa seleccionada',
+                    msg: 'No existen camareros para la empresa seleccionada',
                     users: null
                 })
             }
@@ -57,7 +57,7 @@ function readWaiters(req: Request, res: Response) {
         }).catch(() => {
             return res.status(500).json({
                 ok: false,
-                msg: 'Error al consultar los asistentes para las empresas del user',
+                msg: 'Error al consultar los camareros para las empresas del usuario',
                 users: null
             })
         })
@@ -83,13 +83,13 @@ function updateWaiter(req: Request, res: Response) {
         .then(userDB => {
             return res.status(200).json({
                 ok: true,
-                msg: 'Se actualizo el asistente correctamente',
+                msg: 'Se actualizo el camarero correctamente',
                 user: userDB
             })
         }).catch(() => {
             return res.status(400).json({
                 ok: false,
-                msg: 'Ocurrio un error al actualizar el asistente',
+                msg: 'Ocurrio un error al actualizar el camarero',
                 user: null
             })
         })
@@ -100,13 +100,13 @@ function deleteWaiter(req: Request, res: Response) {
     User.findByIdAndDelete(idWaiter).then((waiterDeleted) => {
         res.status(200).json({
             ok: true,
-            msg: 'Usuario eliminado correctamente',
+            msg: 'Camarero eliminado correctamente',
             user: waiterDeleted
         })
     }).catch(() => {
         res.status(400).json({
             ok: false,
-            msg: 'Error al eliminar al asistente',
+            msg: 'Error al eliminar al camarero',
             user: null
         })
     })
@@ -115,8 +115,6 @@ function deleteWaiter(req: Request, res: Response) {
 // auxiliar
 
 function readWaitersUser(req: Request, res: Response) {
-    // obtiene todos los asistentes de todas las empresas de un usuario
-
     let idUser = req.params.idUser;
     Company.find({ id_user: idUser }).then(companiesDB => {
         return companiesDB.map(data => data._id) // solo quiero los _id
@@ -127,7 +125,7 @@ function readWaitersUser(req: Request, res: Response) {
                 if (!usersDB) {
                     return res.status(400).json({
                         ok: false,
-                        msg: 'No existen asistentes para la empresa seleccionada',
+                        msg: 'No existen camareros para la empresa seleccionada',
                         users: null
                     })
                 }
@@ -139,13 +137,13 @@ function readWaitersUser(req: Request, res: Response) {
             }).catch(() => {
                 return res.status(500).json({
                     ok: false,
-                    msg: 'Error al consultar los asistentes para las empresas del user',
+                    msg: 'Error al consultar los camareros para las empresas del usuario',
                     users: null
                 })
             }).catch(() => {
                 return res.status(500).json({
                     ok: false,
-                    msg: 'Error al consultar las empresas del user',
+                    msg: 'Error al consultar las empresas del usuario',
                     users: null
                 })
             })
