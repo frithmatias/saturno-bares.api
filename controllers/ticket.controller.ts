@@ -457,7 +457,7 @@ function readTickets(req: Request, res: Response) {
 			if (tickets.length > 0) {
 				return res.status(200).json({
 					ok: true,
-					msg: "Se encontraron tickets para la empresa solicitada.",
+					msg: "Tickets obtenidos correctamente",
 					tickets
 				});
 			}

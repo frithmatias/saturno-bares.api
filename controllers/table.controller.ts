@@ -121,20 +121,15 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
             tableDB.save().then(async statusSaved => {
 
-                if (tableDB.tx_status !== 'idle') {
-                    return res.status(200).json({
-                        ok: true,
-                        msg: 'busy',
-                        table: tableDB
-                    })
+                if (tableDB.tx_status === 'idle') {
+                    await spmPull(tableDB);
                 }
-                let spm = await spmPull(tableDB);
 
 
                 return res.status(200).json({
                     ok: true,
-                    msg: spm.status,
-                    table: spm.table
+                    msg: `Estado ${statusSaved.tx_status} guardado correctamente`,
+                    table: tableDB
                 })
 
 
