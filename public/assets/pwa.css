@@ -10,3 +10,7 @@
   cursor: pointer;
   width: 20px;
 }
+
+.body {
+  color: yellow;
+}

@@ -1,4 +1,12 @@
 if (navigator.serviceWorker) {
+
+  // cssLink = document.createElement("link");
+  // cssLink.id = "addToHomeScreen";
+  // cssLink.rel = "stylesheet";
+  // cssLink.type = "text/css";
+  // cssLink.href = "assets/pwa.css";
+  // document.head.appendChild(cssLink);
+
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').then(function (reg) {
       swReg = reg
@@ -12,14 +20,14 @@ var btnActivadas = document.getElementById('notifActivadas')
 var btnDesactivadas = document.getElementById('notifDesactivadas')
 
 // obtiene la public key
-function getPublicKey () {
+function getPublicKey() {
   return fetch('https://saturno-fun.herokuapp.com/n/key')
     .then(res => res.arrayBuffer())
     .then(key => new Uint8Array(key))
 }
 
 // cambia el estado del botón de suscripción
-function verificaSuscripcion (activadas) {
+function verificaSuscripcion(activadas) {
   if (activadas) {
     // btnActivadas.classList.remove('oculto')
     btnDesactivadas.classList.add('oculto')
@@ -34,9 +42,9 @@ btnDesactivadas.addEventListener('click', function () {
   if (!swReg) return console.log('No hay registro de SW')
   getPublicKey().then(key => {
     swReg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: key
-      })
+      userVisibleOnly: true,
+      applicationServerKey: key
+    })
       .then(res => res.toJSON())
       .then(suscripcion => {
         fetch('https://saturno-fun.herokuapp.com/n/subscribe', {
@@ -44,25 +52,25 @@ btnDesactivadas.addEventListener('click', function () {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(suscripcion)
         })
-        .then( resp => {
-          verificaSuscripcion(resp.ok);
-         })
-        .catch( cancelarSuscripcon  )
+          .then(resp => {
+            verificaSuscripcion(resp.ok);
+          })
+          .catch(cancelarSuscripcon)
 
       })
   })
 })
 
 // cancel subscription
-function cancelarSuscripcon(){
+function cancelarSuscripcon() {
   // Como se hace swReg.pushManager.subscribe() pareciera que lo que tenemos que hacer es un 
   // swReg.pushManager.unsubscribe() pero no, no funciona así, no funciona como un observable de RXJS. 
-  swReg.pushManager.getSubscription().then( subs => {
-      subs.unsubscribe()
-      .then(()=> verificaSuscripcion(false));
+  swReg.pushManager.getSubscription().then(subs => {
+    subs.unsubscribe()
+      .then(() => verificaSuscripcion(false));
   })
 }
 
-btnActivadas.addEventListener('click', function(){
+btnActivadas.addEventListener('click', function () {
   cancelarSuscripcon();
 })

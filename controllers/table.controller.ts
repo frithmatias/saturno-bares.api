@@ -57,6 +57,7 @@ let readTables = (req: Request, res: Response) => {
                     path: 'id_session',
                     populate: { path: 'id_ticket' }
                 })
+                .sort({id_section:1,nm_table:1})
                 .then(tablesDB => {
                     if (!tablesDB) {
                         return res.status(400).json({

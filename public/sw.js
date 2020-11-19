@@ -13,20 +13,20 @@ self.addEventListener('install', e => {
       return cache.addAll([
         '/',
         '/index.html',
-        '/55.8cb65e073d47da8fe9e8.js',
-        '/66.1d9750f3cab9ef3b3797.js',
-        '/77.e2cbd93621b2cd0abde4.js',
-        '/88.31e8b685d97edeca80b0.js',
-        '/99.4b45bd400678b96b4d3b.js',
-        '/bbghome.2374cce18f9d245fa1a9.jpg',
-        '/bbgtile1.24387b8acb702323a6b6.png',
-        '/bbgtile2.916b8a1f682edacc68a2.png',
-        '/bbgtile3.0df35a810f9f086285c1.png',
-        '/ccommon.14facb5e31e9f97fc6b0.js',
-        '/mmain.240eb9cfc42c6012eb69.js',
-        '/ppolyfills.5aab4676029f8f7a1213.js',
-        '/rruntime.10644e8ba603d43616ed.js',
-        '/sstyles.52a58422e0ab5e258e7f.css'
+        '/5.1c23c20488fa3917ead9.js',
+        '/6.e02c37198a40daf18bc3.js',
+        '/7.af87f65e9256db575445.js',
+        '/8.3d6230e148245381b05f.js',
+        '/9.06c9e45980ac998afd3c.js',
+        '/bghome.2374cce18f9d245fa1a9.jpg',
+        '/bgtile1.24387b8acb702323a6b6.png',
+        '/bgtile2.916b8a1f682edacc68a2.png',
+        '/bgtile3.0df35a810f9f086285c1.png',
+        '/common.ae338539bf7110378eb0.js',
+        '/main.ff548df46e6cb6b62b92.js',
+        '/polyfills.e95903275e33ac0ccdfb.js',
+        '/runtime.89759098924f6641db19.js',
+        '/styles.a55419e163e7eab1ad9e.css'
       ])
     })
     .catch(() => {
@@ -37,9 +37,18 @@ self.addEventListener('install', e => {
     .open(CACHE_INMUTABLE)
     .then(cache => {
       return cache.addAll([
+
         '/app.js',
         '/favicon.ico',
         '/manifest.json',
+        '/assets/pwa.css',
+        '/assets/bell.wav',
+        '/assets/img/noti-off.png',
+        '/assets/img/noti-on.png',
+        '/assets/img/saturn.png',
+        '/assets/img/myticket-background.png',
+        '/assets/img/saturno-menu.png',
+        '/assets/img/saturno-selector-empresas.png',
         '/assets/img/icons/logo72x72.png',
         '/assets/img/icons/logo96x96.png',
         '/assets/img/icons/logo128x128.png',
@@ -52,12 +61,7 @@ self.addEventListener('install', e => {
         '/assets/img/icons-ios/apple-launch-750x1334.png',
         '/assets/img/icons-ios/apple-launch-1125x2436.png',
         '/assets/img/icons-ios/apple-launch-1242x2208.png',
-        '/assets/img/mean-mini.png',
-        '/assets/img/noti-off.png',
-        '/assets/img/noti-on.png',
-        '/assets/img/saturn.png',
-        '/assets/bell.wav',
-        '/assets/pwa.css',
+
       ])
     })
     .catch(() => {
