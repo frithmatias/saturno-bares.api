@@ -13,6 +13,7 @@ function createCompany(req: Request, res: Response) {
   var company = new Company({
     id_user: body.company.id_user,
     tx_company_name: body.company.tx_company_name,
+    tx_company_slogan: body.company.tx_company_slogan,
     tx_public_name: body.company.tx_public_name,
     tx_address_street: body.company.tx_address_street,
     tx_address_number: body.company.tx_address_number,
@@ -73,10 +74,10 @@ function readCompanies(req: Request, res: Response) {
   Company.find({ id_user: idUser }).then(companiesDB => {
 
     if (!companiesDB) {
-      return res.status(400).json({
+      return res.status(200).json({
         ok: false,
         msg: "No existen empresas asociadas al user",
-        companies: null
+        companies: []
       });
     }
 
@@ -131,6 +132,7 @@ function updateCompany(req: Request, res: Response) {
 
   Company.findByIdAndUpdate(body._id, {
     tx_company_name: body.tx_company_name,
+    tx_company_slogan: body.tx_company_slogan,
     tx_public_name: body.tx_public_name,
     cd_city: body.cd_city,
     tx_address_street: body.tx_address_street,

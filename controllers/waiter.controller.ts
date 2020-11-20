@@ -43,10 +43,10 @@ function readWaiters(req: Request, res: Response) {
     User.find({ id_company: idCompany })
         .populate('id_company').then(usersDB => {
             if (!usersDB) {
-                return res.status(400).json({
+                return res.status(200).json({
                     ok: false,
                     msg: 'No existen camareros para la empresa seleccionada',
-                    users: null
+                    users: []
                 })
             }
             return res.status(200).json({
@@ -123,10 +123,10 @@ function readWaitersUser(req: Request, res: Response) {
             .find({ $or: [{ '_id': idUser }, { id_company: { $in: resp } }] })
             .populate('id_company').then(usersDB => {
                 if (!usersDB) {
-                    return res.status(400).json({
+                    return res.status(200).json({
                         ok: false,
                         msg: 'No existen camareros para la empresa seleccionada',
-                        users: null
+                        users: []
                     })
                 }
                 return res.status(200).json({

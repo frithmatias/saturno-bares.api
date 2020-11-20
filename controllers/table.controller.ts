@@ -13,6 +13,7 @@ import tkt from './ticket.controller';
 let createTable = (req: Request, res: Response) => {
 
     var { id_section, nm_table, nm_persons } = req.body;
+
     var table = new Table({
         id_section,
         nm_table,
@@ -20,6 +21,7 @@ let createTable = (req: Request, res: Response) => {
         tx_satus: 'paused',
         id_session: null
     });
+    
     table.save().then((tableSaved) => {
         res.status(200).json({
             ok: true,
@@ -42,10 +44,10 @@ let readTables = (req: Request, res: Response) => {
         .then(sectionsDB => {
 
             if (!sectionsDB || sectionsDB.length === 0) {
-                return res.status(400).json({
+                return res.status(200).json({
                     ok: false,
-                    msg: 'No existen sectores para la empresa solicitada',
-                    tables: null
+                    msg: 'No existen mesas para la empresa solicitada',
+                    tables: []
                 })
             }
 
@@ -60,10 +62,10 @@ let readTables = (req: Request, res: Response) => {
                 .sort({id_section:1,nm_table:1})
                 .then(tablesDB => {
                     if (!tablesDB) {
-                        return res.status(400).json({
+                        return res.status(200).json({
                             ok: false,
                             msg: 'No existen mesas para la empresa seleccionada',
-                            tables: null
+                            tables: []
                         })
                     }
                     return res.status(200).json({

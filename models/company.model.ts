@@ -4,6 +4,7 @@ import uniqueValidator from 'mongoose-unique-validator';
 const companySchema = new Schema({
     id_user: {type: String, required: [true, 'El id_user es necesario']},
     tx_company_name: {type: String, unique: true, required: [true, 'El tx_company_name es necesario']},
+    tx_company_slogan: {type: String, required: false},
     tx_public_name: {type: String, unique: true, required: [true, 'El tx_public_name es necesario']},
     tx_address_street: {type: String, required: false},
     tx_address_number: {type: String, required: false},
@@ -15,6 +16,7 @@ const companySchema = new Schema({
 interface Company extends Document {
     id_user: string;
     tx_company_name: string;
+    tx_company_slogan: string;
     tx_address_street: string;
     tx_address_number: string;
     cd_city: string;

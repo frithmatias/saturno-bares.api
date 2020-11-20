@@ -35,10 +35,10 @@ function createMenu(req: Request, res: Response) {
 function readMenu(req: Request, res: Response) {
     Menu.find({}).then(menuDB => {
         if (!menuDB) {
-            return res.status(400).json({
+            return res.status(200).json({
                 ok: false,
-                msg: 'No existen menu en la base de datos!',
-                menuitem: null
+                msg: 'No existen items de menu en la base de datos!',
+                menuitem: []
             })
         }
         return res.status(200).json({

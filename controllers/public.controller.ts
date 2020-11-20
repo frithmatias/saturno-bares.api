@@ -63,10 +63,10 @@ function getScoreItems(req: Request, res: Response) {
 
   ScoreItem.find({id_section: idSection, bl_active: true}).then(itemsToScore => {
     if(itemsToScore.length === 0){
-      return res.status(400).json({
+      return res.status(200).json({
         ok: false, 
         msg: 'No existen items para calificar en este sector',
-        scoreitems: null
+        scoreitems: []
       })
     }
 

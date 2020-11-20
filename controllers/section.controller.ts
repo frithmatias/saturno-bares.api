@@ -42,10 +42,10 @@ function readSections(req: Request, res: Response) {
 
         .then(sectionsDB => {
             if (!sectionsDB) {
-                return res.status(400).json({
+                return res.status(200).json({
                     ok: false,
                     msg: 'No existen sectores para la empresa seleccionada',
-                    sections: null
+                    sections: []
                 })
             }
             return res.status(200).json({
@@ -74,10 +74,10 @@ function readSessions(req: Request, res: Response) {
             sectionSession.find({ id_section: { $in: resp }, tm_end: null }).populate('id_section').then(sessionsDB => {
 
                 if (!resp) {
-                    return res.status(400).json({
+                    return res.status(200).json({
                         ok: false,
                         msg: 'No existen sesiones para la empresa seleccionada',
-                        sessions: null
+                        sessions: []
                     })
                 }
 
