@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Company } from '../models/company.model';
 import { Contact } from '../models/contact.model';
-import { ScoreItem } from '../models/score.item.model';
+import { ScoreItem } from '../models/scoreitem.model';
 import { Score } from '../models/score.model';
 
 function getClientData(req: Request, res: Response) {
@@ -61,7 +61,7 @@ function postContact(req: Request, res: Response) {
 function getScoreItems(req: Request, res: Response) {
   let idSection = req.params.idSection;
 
-  ScoreItem.find({id_section: idSection, bl_active: true}).then(itemsToScore => {
+  ScoreItem.find({id_section: idSection}).then(itemsToScore => {
     if(itemsToScore.length === 0){
       return res.status(200).json({
         ok: false, 

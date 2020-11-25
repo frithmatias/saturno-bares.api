@@ -17,6 +17,8 @@ import companyRoutes from './routes/company.routes';
 import sectionRoutes from './routes/section.routes';
 import waiterRoutes from './routes/waiter.routes';
 import tableRoutes from './routes/table.routes';
+import scoreItemRoutes from './routes/scoreitem.routes';
+
 
 import notificationRoutes from './routes/notification.routes';
 import indicatorRoutes from './routes/indicator.routes';
@@ -56,19 +58,16 @@ server.app.use(cors({ origin: true, credentials: true })); // permito que cualqu
 // RUTAS
 server.app.use('/t', ticketRoutes);
 server.app.use('/p', publicRoutes);
-
 server.app.use('/superuser', superuserRoutes);
 server.app.use('/u', userRoutes);
-
 server.app.use('/c', companyRoutes);
 server.app.use('/section', sectionRoutes);
 server.app.use('/w', waiterRoutes);
 server.app.use('/table', tableRoutes);
-
 server.app.use('/n', notificationRoutes);
 server.app.use('/metrics', metricRoutes);
 server.app.use('/i', indicatorRoutes);
-
+server.app.use('/scoreitem', scoreItemRoutes);
 
 server.start(() => {
 	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }

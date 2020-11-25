@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { Section } from '../models/section.model';
 import { sectionSession } from '../models/section.session.model';
-import { Company } from '../models/company.model';
 
 // ========================================================
 // Section Methods
@@ -17,11 +16,14 @@ function createSection(req: Request, res: Response) {
     });
 
     section.save().then((sectionSaved) => {
-        res.status(200).json({
+
+        return res.status(200).json({
             ok: true,
             msg: 'Sector guardado correctamente',
             section: sectionSaved
         })
+
+
     }).catch((err) => {
         res.status(400).json({
             ok: false,
@@ -41,6 +43,7 @@ function readSections(req: Request, res: Response) {
         })
 
         .then(sectionsDB => {
+
             if (!sectionsDB) {
                 return res.status(200).json({
                     ok: false,
@@ -121,7 +124,7 @@ function takeSection(req: Request, res: Response) {
     let idWaiter = req.body.idWaiter;
 
     sectionSession.findOne({ id_section: idSection, id_waiter: idWaiter, tm_end: null }).then(activeSession => {
-        console.log(activeSession)
+
         if (activeSession) {
             return res.status(400).json({
                 ok: false,

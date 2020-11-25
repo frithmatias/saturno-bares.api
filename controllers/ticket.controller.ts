@@ -245,7 +245,9 @@ function releaseTicket(req: Request, res: Response) {
 
 function endTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: + new Date().getTime() }).then((ticketCanceled) => {
+	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: + new Date().getTime() }, { new: true }).then((ticketCanceled) => {
+
+
 		if (ticketCanceled?.id_session) {
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
@@ -280,7 +282,16 @@ function endTicket(req: Request, res: Response) {
 					ticket: null
 				})
 			})
+		} else {
+			return res.status(200).json({
+				ok: true,
+				msg: "Ticket finalizado correctamente",
+				ticket: ticketCanceled
+			})
 		}
+
+
+
 	}).catch(() => {
 		return res.status(400).json({
 			ok: false,
