@@ -247,7 +247,14 @@ function endTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: + new Date().getTime() }, { new: true }).then((ticketCanceled) => {
 
-
+		if(!ticketCanceled){
+			return res.status(400).json({
+				ok: false, 
+				msg: 'No se puedo cancelar el ticket',
+				ticket: ticketCanceled
+			})
+		}
+		
 		if (ticketCanceled?.id_session) {
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
@@ -262,6 +269,7 @@ function endTicket(req: Request, res: Response) {
 					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
 						server.io.to(ticketCanceled.id_company).emit('update-waiters');
 						server.io.to(ticketCanceled.id_company).emit('update-clients');
+						console.log('ENVIANDO FIN')
 						return res.status(200).json({
 							ok: true,
 							msg: "Ticket finalizado correctamente",
@@ -283,6 +291,8 @@ function endTicket(req: Request, res: Response) {
 				})
 			})
 		} else {
+			server.io.to(ticketCanceled.id_company).emit('update-waiters');
+			server.io.to(ticketCanceled.id_company).emit('update-clients');
 			return res.status(200).json({
 				ok: true,
 				msg: "Ticket finalizado correctamente",
@@ -307,7 +317,7 @@ function endTicket(req: Request, res: Response) {
 
 function createTicket(req: Request, res: Response) {
 
-	const { idSocket, blPriority, nmPersons, idSection } = req.body;
+	const { idSocket, nmPersons, idSection } = req.body;
 
 	const idDay = + new Date().getDate();
 	const idMonth = + new Date().getMonth() + 1;
@@ -365,7 +375,7 @@ function createTicket(req: Request, res: Response) {
 				id_section: idSection,
 				id_session: null,
 				nm_persons: nmPersons,
-				bl_priority: blPriority,
+				bl_priority: false,
 				tx_call: null,
 				tm_call: null,
 				tx_status: 'queued',

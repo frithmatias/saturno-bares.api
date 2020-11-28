@@ -1,0 +1,74 @@
+{
+  "name": "Saturno | Bar & Resto",
+  "short_name": "Saturno Bares",
+  "theme_color": "#151515",
+  "background_color": "#151515",
+  "display": "standalone",
+  "orientation": "portrait",
+  "Scope": "/",
+  "start_url": "/",
+  "icons": [
+      
+    {
+      "src": "assets/img/icons/logo72x72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo384x384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons/logo512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons-ios/apple-launch-640x1136.png",
+      "sizes": "640x1136",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons-ios/apple-launch-750x1334.png",
+      "sizes": "750x1334",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons-ios/apple-launch-1125x2436.png",
+      "sizes": "1125x2436",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icons-ios/apple-launch-1242x2208.png",
+      "sizes": "1242x2208",
+      "type": "image/png"
+    }
+  ],
+  "splash_pages": null
+}
