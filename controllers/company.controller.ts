@@ -10,14 +10,17 @@ import { Table } from '../models/table.model';
 function createCompany(req: Request, res: Response) {
   // Save Company
   var body = req.body;
+  console.log(body)
   var company = new Company({
     id_user: body.company.id_user,
     tx_company_name: body.company.tx_company_name,
     tx_company_slogan: body.company.tx_company_slogan,
-    tx_public_name: body.company.tx_public_name,
+    tx_company_string: body.company.tx_company_string,
+    tx_company_location: body.company.tx_company_location,
+    tx_company_lat: body.company.tx_company_lat,
+    tx_company_lng: body.company.tx_company_lng,
     tx_address_street: body.company.tx_address_street,
     tx_address_number: body.company.tx_address_number,
-    cd_city: body.company.cd_city,
     tm_start: null,
     tm_end: null
   });
@@ -43,7 +46,7 @@ function createCompany(req: Request, res: Response) {
 function readCompany(req: Request, res: Response) {
   var idCompany = String(req.params.idCompany);
 
-  Company.findOne({ tx_public_name: idCompany }).then(companyDB => {
+  Company.findById(idCompany).then(companyDB => {
 
     if (!companyDB) {
       return res.status(400).json({
@@ -129,14 +132,18 @@ function findCompany(req: Request, res: Response) {
 function updateCompany(req: Request, res: Response) {
 
   var body = req.body;
-
+  console.log(body)
   Company.findByIdAndUpdate(body._id, {
-    tx_company_name: body.tx_company_name,
-    tx_company_slogan: body.tx_company_slogan,
-    tx_public_name: body.tx_public_name,
-    cd_city: body.cd_city,
-    tx_address_street: body.tx_address_street,
-    tx_address_number: body.tx_address_number
+
+    tx_company_name: body.company.tx_company_name,
+    tx_company_slogan: body.company.tx_company_slogan,
+    tx_company_string: body.company.tx_company_string,
+    tx_company_location: body.company.tx_company_location,
+    tx_company_lat: body.company.tx_company_lat,
+    tx_company_lng: body.company.tx_company_lng,
+    tx_address_street: body.company.tx_address_street,
+    tx_address_number: body.company.tx_address_number
+
   }).then(companyDB => {
 
     if (!companyDB) {
@@ -185,7 +192,7 @@ function deleteCompany(req: Request, res: Response) {
 function checkCompanyExists(req: Request, res: Response) {
 
   let pattern = req.body.pattern;
-  Company.findOne({ tx_public_name: pattern }).then(companyDB => {
+  Company.findOne({ tx_company_string: pattern }).then(companyDB => {
 
     if (!companyDB) {
       return res.status(200).json({

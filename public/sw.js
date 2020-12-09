@@ -20,7 +20,7 @@ self.addEventListener('install', e => {
         '/9.5225a4f176749edcc9b0.js',
         '/bghome.2374cce18f9d245fa1a9.jpg',
         '/common.ae338539bf7110378eb0.js',
-        '/main.4447a0c10a76e574486e.js',
+        '/main.9d51811afafd8fd41560.js',
         '/polyfills.e95903275e33ac0ccdfb.js',
         '/runtime.edb9460c7e9f6da5b1df.js',
         '/styles.0cda054d8404d76ebf4d.css'
@@ -30,7 +30,7 @@ self.addEventListener('install', e => {
       console.log('error al crear la app shell')
     })
 
-  let inmutable = caches
+    let inmutable = caches
     .open(CACHE_INMUTABLE)
     .then(cache => {
       return cache.addAll([
