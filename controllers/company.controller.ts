@@ -10,17 +10,18 @@ import { Table } from '../models/table.model';
 function createCompany(req: Request, res: Response) {
   // Save Company
   var body = req.body;
-  console.log(body)
+
   var company = new Company({
-    id_user: body.company.id_user,
-    tx_company_name: body.company.tx_company_name,
-    tx_company_slogan: body.company.tx_company_slogan,
-    tx_company_string: body.company.tx_company_string,
-    tx_company_location: body.company.tx_company_location,
-    tx_company_lat: body.company.tx_company_lat,
-    tx_company_lng: body.company.tx_company_lng,
-    tx_address_street: body.company.tx_address_street,
-    tx_address_number: body.company.tx_address_number,
+    id_user: body.id_user,
+    tx_company_name: body.tx_company_name,
+    tx_company_slogan: body.tx_company_slogan,
+    tx_company_string: body.tx_company_string,
+    tx_company_location: body.tx_company_location,
+    cd_company_location: body.cd_company_location,
+    tx_company_lat: body.tx_company_lat,
+    tx_company_lng: body.tx_company_lng,
+    tx_address_street: body.tx_address_street,
+    tx_address_number: body.tx_address_number,
     tm_start: null,
     tm_end: null
   });
@@ -34,19 +35,21 @@ function createCompany(req: Request, res: Response) {
     })
 
   }).catch((err) => {
+
     return res.status(400).json({
       ok: false,
       msg: 'Error al guardar el comercio',
       company: null
     })
+
   })
 
 }
 
 function readCompany(req: Request, res: Response) {
-  var idCompany = String(req.params.idCompany);
+  var txCompanyString = String(req.params.txCompanyString);
 
-  Company.findById(idCompany).then(companyDB => {
+  Company.findOne({tx_company_string: txCompanyString}).then(companyDB => {
 
     if (!companyDB) {
       return res.status(400).json({
@@ -132,17 +135,18 @@ function findCompany(req: Request, res: Response) {
 function updateCompany(req: Request, res: Response) {
 
   var body = req.body;
-  console.log(body)
+
   Company.findByIdAndUpdate(body._id, {
 
-    tx_company_name: body.company.tx_company_name,
-    tx_company_slogan: body.company.tx_company_slogan,
-    tx_company_string: body.company.tx_company_string,
-    tx_company_location: body.company.tx_company_location,
-    tx_company_lat: body.company.tx_company_lat,
-    tx_company_lng: body.company.tx_company_lng,
-    tx_address_street: body.company.tx_address_street,
-    tx_address_number: body.company.tx_address_number
+    tx_company_name: body.tx_company_name,
+    tx_company_slogan: body.tx_company_slogan,
+    tx_company_string: body.tx_company_string,
+    tx_company_location: body.tx_company_location,
+    cd_company_location: body.cd_company_location,
+    tx_company_lat: body.tx_company_lat,
+    tx_company_lng: body.tx_company_lng,
+    tx_address_street: body.tx_address_street,
+    tx_address_number: body.tx_address_number
 
   }).then(companyDB => {
 

@@ -269,7 +269,7 @@ function endTicket(req: Request, res: Response) {
 					Table.findByIdAndUpdate(idTable, { tx_status: new_status, id_session: null }).then(tableCanceled => {
 						server.io.to(ticketCanceled.id_company).emit('update-waiters');
 						server.io.to(ticketCanceled.id_company).emit('update-clients');
-						console.log('ENVIANDO FIN')
+
 						return res.status(200).json({
 							ok: true,
 							msg: "Ticket finalizado correctamente",

@@ -157,11 +157,37 @@ function readLocations(req: Request, res: Response) {
 
 
 }
+
+function readPlacesInLocation(req: Request, res: Response) {
+
+  let idLocation = req.params.idLocation;
+
+  Company.find({ 'cd_company_location': idLocation })
+    .then(companies => {
+
+      if (!companies) {
+        return res.status(400).json({
+          ok: false,
+          msg: 'Error al obtener los bares en la localidad',
+          companies: null
+        })
+      } else {
+        return res.status(200).json({
+          ok: true,
+          msg: 'Bares en la localidad solicitada obtenidas correctamente',
+          companies
+        })
+      }
+    })
+
+}
+
 export = {
   getClientData,
   postContact,
   getScoreItems,
   postScores,
-  readLocations
+  readLocations,
+  readPlacesInLocation
 }
 
