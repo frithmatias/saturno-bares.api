@@ -1,6 +1,6 @@
-const CACHE_STATIC = 'static-0.1'
-const CACHE_DYNAMIC = 'dynamic-0.1'
-const CACHE_INMUTABLE = 'inmutable-0.1'
+const CACHE_STATIC = 'static-0.2'
+const CACHE_DYNAMIC = 'dynamic-0.2'
+const CACHE_INMUTABLE = 'inmutable-0.2'
 
 // ----------------------------------------------------------
 // app shell
@@ -12,25 +12,23 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/index.html',
-        '/5.ef8552aca8062f96a906.js',
-        '/6.ccfb61d9f68ff96397ed.js',
-        '/7.e5cb6b1189a0b020924a.js',
-        '/8.f8661b12f754a98e0305.js',
-        '/9.5225a4f176749edcc9b0.js',
+        '/4.07e46f68e2f32cd306b7.js',
+        '/5.3e5c5a7720b33a53442d.js',
+        '/6.1b650ee2dde5f61999f3.js',
+        '/7.1490ced38eee230a4668.js',
+        '/8.48d7f559c9b2dbb1f040.js',
         '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/common.ae338539bf7110378eb0.js',
-        '/main.9d51811afafd8fd41560.js',
-        '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.edb9460c7e9f6da5b1df.js',
-        '/styles.0cda054d8404d76ebf4d.css'
+        '/main.89779566d052f7eb0674.js',
+        '/polyfills.55e8b146f56f30089013.js',
+        '/runtime.b37cd90d15a62fb11fc5.js',
+        '/styles.5b5db6639820922d8dd8.css'
       ])
     })
     .catch(() => {
       console.log('error al crear la app shell')
     })
 
-    let inmutable = caches
+  let inmutable = caches
     .open(CACHE_INMUTABLE)
     .then(cache => {
       return cache.addAll([
@@ -40,6 +38,8 @@ self.addEventListener('install', e => {
         '/manifest.json',
         '/assets/pwa.css',
         '/assets/bell.wav',
+        '/assets/img/map/duff-beer.svg',
+        '/assets/img/map/marker-30.png',
         '/assets/img/noti-off.png',
         '/assets/img/noti-on.png',
         '/assets/img/saturn.png',

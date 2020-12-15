@@ -12,6 +12,9 @@ const companySchema = new Schema({
     tx_company_lng: { type: String, required: [true, 'El tx_company_lng es necesario'] },
     tx_address_street: { type: String, required: [true, 'El tx_address_street es necesario'] },
     tx_address_number: { type: String, required: [true, 'El tx_address_number es necesario'] },
+    tx_company_history: { type: String, required: false },
+    tx_company_logo: { type: String, required: false }, // busy, paused, idle, reserved 
+    tx_company_banners: { type: [String], required: false }, // busy, paused, idle, reserved 
     tm_start: { type: Date, required: false },
     tm_end: { type: Date, required: false },
 }, { collection: "companies" })
@@ -27,6 +30,9 @@ interface Company extends Document {
     cd_company_location: string;
     tx_company_lat: string;
     tx_company_lng: string;
+    tx_company_history: string;
+    tx_company_logo: string;
+    tx_company_banners: string[];
     tm_start: Date;
     tm_end: Date;
 }

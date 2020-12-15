@@ -1,6 +1,7 @@
 //import { SERVER_PORT } from "./global/environment";
 import Server from './classes/server';
 import bodyParser from 'body-parser';
+import fileUpload from 'express-fileupload';
 import cors from 'cors';
 import path from 'path';
 import express from 'express';
@@ -23,8 +24,8 @@ import scoreItemRoutes from './routes/scoreitem.routes';
 import notificationRoutes from './routes/notification.routes';
 import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
-
-
+import uploadRoutes from './routes/upload.routes';
+import imageRoutes from './routes/image.routes';
 
 
 import environment from './global/environment';
@@ -52,6 +53,9 @@ server.app.use(express.static(publicPath));
 server.app.use(bodyParser.urlencoded({ extended: true }));
 server.app.use(bodyParser.json());
 
+// express-fileupload
+server.app.use(fileUpload());
+
 // CORS
 server.app.use(cors({ origin: true, credentials: true })); // permito que cualquier persona puede llamar mis servicios.
 
@@ -68,6 +72,10 @@ server.app.use('/n', notificationRoutes);
 server.app.use('/metrics', metricRoutes);
 server.app.use('/i', indicatorRoutes);
 server.app.use('/scoreitem', scoreItemRoutes);
+server.app.use('/uploads', uploadRoutes);
+server.app.use('/image', imageRoutes);
+
+
 
 server.start(() => {
 	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }
