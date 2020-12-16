@@ -25,16 +25,16 @@ function getImage2(req: Request, res: Response) {
 // frontend <- [HTTP] <- backend <- [FTP] <- hostinger
 async function getImage(req: Request, res: Response) {
     var idCompany = req.params.idCompany;
-    var fileName = req.params.fileName;
-    console.log(idCompany, fileName)
+    var idType = req.params.idType;
+    var idFile = req.params.idFile;
 
     // ../../ -> tengo que salir de la carpeta 'server' donde transpila TypeScript
-    var pathImage = path.resolve(__dirname, `../../uploads/${idCompany}/${fileName}`);
+    var pathImage = path.resolve(__dirname, `../../uploads/${idCompany}/${idType}/${idFile}`);
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
         // si no existe puede ser que sea una solicitud apra mostrar una imagen por defecto.
-        if (['no-img.jpg', 'xxx'].includes(fileName)) {
+        if (['no-img.jpg', 'xxx'].includes(idFile)) {
             var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
             res.sendFile(pathNoImage);
         } else {
@@ -56,13 +56,13 @@ async function getImage(req: Request, res: Response) {
 }
 
 // Si el archivo no existe en Heroku lo busco en Hostinger.
-function downloadHTTP(idCompany: string, fileName: string): Promise<boolean> {
+function downloadHTTP(idCompany: string, idFile: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
         // creo nuevamente la carpeta de usuario en Heroku
         fileSystem.createFolder(`./uploads/${idCompany}`);
 
         // hago la descarga de la imágen solicitada a heroku pero en Hostinger
-        const url = `http://www.satruno.fun/uploads/${idCompany}/${fileName}`;
+        const url = `http://www.satruno.fun/uploads/${idCompany}/${idFile}`;
 
         var download = (url: string, dest: string) => {
             var file = fs.createWriteStream(dest);
@@ -84,7 +84,7 @@ function downloadHTTP(idCompany: string, fileName: string): Promise<boolean> {
             });
         };
 
-        download(url, `./uploads/${idCompany}/${fileName}`);
+        download(url, `./uploads/${idCompany}/${idFile}`);
     });
 
 }

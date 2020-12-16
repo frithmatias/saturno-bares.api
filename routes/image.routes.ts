@@ -9,6 +9,6 @@ import ImageController from '../controllers/image.controller';
 // ROUTES
 const imageRoutes = Router();
 
-imageRoutes.get('/:idCompany/:fileName', ImageController.getImage);
+imageRoutes.get('/:idCompany/:idType/:idFile', ImageController.getImage);
 
 export default imageRoutes;

@@ -8,11 +8,28 @@ function createFolder(dirPath: string) {
     // seems like fs works fine with dirPath instead completePath
     // var completePath = path.resolve(__dirname, '../', dirPath);
     var existe = fs.existsSync(dirPath);
-    
+
     if (!existe) {
-        fs.mkdirSync(dirPath, {recursive: true});
-    } 
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
     // return completePathTemp;
+}
+
+function syncFolder(dirPath: string, filesInDb: string[]): Promise<void> {
+    return new Promise(resolve => {
+        if (fs.existsSync(dirPath)) {
+            fs.readdirSync(dirPath).forEach((file, index) => {
+                console.log('Sync file', file)
+                if(!filesInDb.includes(file)){
+                    const curPath = [dirPath, file].join('/');
+                    fs.unlinkSync(curPath);
+                }
+            })
+            resolve();
+            console.log('Fin de syncFolder')
+        }
+
+    })
 }
 
 function deleteFolder(dirPath: string) {
@@ -43,4 +60,4 @@ function deleteFolder(dirPath: string) {
 
 
 
-export = { createFolder, deleteFolder }
+export = { createFolder, deleteFolder, syncFolder }
