@@ -27,31 +27,13 @@ async function getImage(req: Request, res: Response) {
     var idCompany = req.params.idCompany;
     var idType = req.params.idType;
     var idFile = req.params.idFile;
-
     // ../../ -> tengo que salir de la carpeta 'server' donde transpila TypeScript
     var pathImage = path.resolve(__dirname, `../../uploads/${idCompany}/${idType}/${idFile}`);
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
-        // si no existe puede ser que sea una solicitud apra mostrar una imagen por defecto.
-        if (['no-img.jpg', 'xxx'].includes(idFile)) {
-            var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
-            res.sendFile(pathNoImage);
-        } else {
-
-            var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
-            res.sendFile(pathNoImage);
-
-            // Si no esta en heroku y no solicita la imagen por defecto, entonces la busco en Hostinger
-            // await downloadHTTP(id, img).then(() => {
-            //     // downloadHTTP guarda la imagen solicitada en la carpeta solicitada en Heroku y la devuelve
-            //     if (fs.existsSync(pathImage)) {
-            //         res.sendFile(pathImage);
-            //     }
-            // }).catch(() => {
-            //     console.log('Error al obtener las imagenes del backend de imagenes');
-            // });
-        }
+        var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+        res.sendFile(pathNoImage);
     }
 }
 
@@ -78,7 +60,6 @@ function downloadHTTP(idCompany: string, idFile: string): Promise<boolean> {
                 });
             }).on('error', (err: any) => { // Manejo el error
                 fs.unlink(dest, () => {
-                    console.log('Ocurrio un error')
                 }); // elimino el archivo asincronamente
                 reject(err.message);
             });

@@ -10,7 +10,7 @@ import { Table } from '../models/table.model';
 function createCompany(req: Request, res: Response) {
   // Save Company
   var body = req.body;
-
+  
   var company = new Company({
     id_user: body.id_user,
     tx_company_name: body.tx_company_name,
@@ -39,7 +39,7 @@ function createCompany(req: Request, res: Response) {
     return res.status(400).json({
       ok: false,
       msg: 'Error al guardar el comercio',
-      company: null
+      company: err
     })
 
   })
@@ -49,7 +49,7 @@ function createCompany(req: Request, res: Response) {
 function readCompany(req: Request, res: Response) {
   var txCompanyString = String(req.params.txCompanyString);
 
-  Company.findOne({tx_company_string: txCompanyString}).then(companyDB => {
+  Company.findOne({ tx_company_string: txCompanyString }).then(companyDB => {
 
     if (!companyDB) {
       return res.status(400).json({

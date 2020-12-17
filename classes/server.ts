@@ -36,7 +36,6 @@ export default class Server {
 
 		// Emisión de eventos
 		this.io.on('connection', (cliente) => {
-			console.log('Cliente conectado', cliente.id);
 			// cliente.to(cliente.id).emit('adjuntar-sesion-ticket', cliente.id);
 			socket.escucharMensajes(cliente, this.io);
 		});

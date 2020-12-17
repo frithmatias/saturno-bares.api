@@ -111,7 +111,7 @@ function grabarImagenBD(txType: string, idCompany: string, archivoNombre: string
                 }
 
                 //borro imagen vieja
-                var pathViejo = `./uploads/${idCompany}/${companyDB.tx_company_logo}`;
+                var pathViejo = `./uploads/${idCompany}/${txType}/${companyDB.tx_company_logo}`;
 
                 if (fs.existsSync(pathViejo)) {
                     fs.unlinkSync(pathViejo);
@@ -120,7 +120,8 @@ function grabarImagenBD(txType: string, idCompany: string, archivoNombre: string
                 return resolve({
                     ok: true,
                     msg: "Logo actualizado correctamente",
-                    company: companyDB
+                    company: companyDB,
+                    filename: archivoNombre
                 });
 
 
@@ -190,7 +191,7 @@ function deleteImagen(req: Request, res: Response) {
     // Puede tomar el nombre del archivo o "TODAS" para elimnar todas las imagenes del aviso
     var filename = req.params.filename;
 
-    if (txType === "banner") {
+    
 
         Company.findById(idCompany).then(companyDB => {
 
@@ -204,17 +205,18 @@ function deleteImagen(req: Request, res: Response) {
 
             var dirPath = `./uploads/${idCompany}/${txType}`;
 
-            if (filename === 'todas') {
+            if (txType === 'banner') {
+                if (filename === 'todas') {
+                    companyDB.tx_company_banners = [];
+                } else {
+                    companyDB.tx_company_banners = companyDB.tx_company_banners.filter(archivo => archivo != filename);
+                }
+                fileSystem.syncFolder(dirPath, companyDB.tx_company_banners);
+            }
 
-                companyDB.tx_company_banners = [];
+            if (txType === 'logo' ) {
+                companyDB.tx_company_logo = 'default-logo.svg';
                 fileSystem.syncFolder(dirPath, []);
-
-            } else {
-
-                companyDB.tx_company_banners = companyDB.tx_company_banners.filter(archivo => archivo != filename);
-                var filePath = `./uploads/${idCompany}/${txType}/${filename}`;
-                if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-
             }
 
             // ===================================================
@@ -231,7 +233,6 @@ function deleteImagen(req: Request, res: Response) {
                     });
             });
         });
-    }
 
 }
 

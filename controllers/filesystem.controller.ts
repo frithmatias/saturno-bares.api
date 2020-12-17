@@ -19,14 +19,12 @@ function syncFolder(dirPath: string, filesInDb: string[]): Promise<void> {
     return new Promise(resolve => {
         if (fs.existsSync(dirPath)) {
             fs.readdirSync(dirPath).forEach((file, index) => {
-                console.log('Sync file', file)
                 if(!filesInDb.includes(file)){
                     const curPath = [dirPath, file].join('/');
                     fs.unlinkSync(curPath);
                 }
             })
             resolve();
-            console.log('Fin de syncFolder')
         }
 
     })
