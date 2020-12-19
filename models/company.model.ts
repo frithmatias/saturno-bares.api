@@ -19,7 +19,7 @@ const companySchema = new Schema({
     tx_company_welcome: { type: String, default: 'La Historia o presentación de tu comercio aquí' },
 
     // uploader
-    tx_company_logo: { type: String, default: 'default-logo.svg' }, // busy, paused, idle, reserved 
+    tx_company_logo: { type: String, required: false }, // busy, paused, idle, reserved 
     tx_company_banners: { type: [String], default: [] }, // busy, paused, idle, reserved 
     
     // todo
@@ -39,7 +39,7 @@ interface Company extends Document {
     tx_company_lat: string;
     tx_company_lng: string;
     tx_company_welcome: string;
-    tx_company_logo: string;
+    tx_company_logo: string | null;
     tx_company_banners: string[];
     tm_start: Date;
     tm_end: Date;

@@ -6,6 +6,7 @@ import fs from 'fs';
 import ftp from 'basic-ftp';
 
 import environment from '../global/environment';
+import { User } from '../models/user.model';
 
 
 // ========================================================
@@ -15,11 +16,11 @@ import environment from '../global/environment';
 // front -> [HTTP] -> heroku -> [FTP] -> hostinger
 async function uploadImagen(req: any, res: Response) {
 
-    var txType = req.params.txType;
-    var idCompany = req.params.idCompany;
-    var tiposValidos = ["banner", "logo", "user"];
+    var idField = req.params.idField;
+    var idDocument = req.params.idDocument;
+    var idFieldsValid = ["tx_company_banners", "tx_company_logo", "tx_img"];
 
-    if (!tiposValidos.includes(txType)) {
+    if (!idFieldsValid.includes(idField)) {
         return res.status(400).json({
             ok: false,
             msg: "Error, tipo de imagen no valida.",
@@ -61,14 +62,15 @@ async function uploadImagen(req: any, res: Response) {
     }
 
     var archivoNombre = `${+ new Date()}.${archivoExtension}`;
-    let response: any = await grabarImagenBD(txType, idCompany, archivoNombre, res);
+
+    let response: any = await grabarImagenBD(idField, idDocument, archivoNombre, res);
 
     if (!response.ok) {
         return res.status(400).json(response)
     }
 
     // si no existe la carpeta la crea
-    var pathdir = `./uploads/${idCompany}/${txType}`;
+    var pathdir = `./uploads/${idDocument}/${idField}`;
     fileSystem.createFolder(pathdir);
     let pathfile = `${pathdir}/${archivoNombre}`;
 
@@ -91,52 +93,107 @@ async function uploadImagen(req: any, res: Response) {
     // ================================================================
     // SYNC HOSTINGER FTP: envío las imagenes hacia hostinger por FTP
     // ================================================================
-    // syncHostinger(pathdir).then(() => console.log('subido ok')).catch(err => console.log(err));
+    // syncHostinger(pathdir).then().catch();
 
 }
 
-function grabarImagenBD(txType: string, idCompany: string, archivoNombre: string, res: Response) {
+function deleteImagen(req: Request, res: Response) {
+    var idField = req.params.idField;
+    var idDocument = req.params.idDocument;
+    // Puede tomar el nombre del archivo o "TODAS" para elimnar todas las imagenes del aviso
+    var filename = req.params.filename;
+
+    if (['tx_company_banners', 'tx_company_logo'].includes(idField)) {
+        Company.findById(idDocument).then(companyDB => {
+
+            if (!companyDB) {
+                return res.status(400).json({
+                    ok: false,
+                    msg: "No existe el comercio para la imagen que desea eliminar",
+                    company: null
+                });
+            }
+
+            var dirPath = `./uploads/${idDocument}/${idField}`;
+
+
+            if (idField === 'tx_company_banners') {
+                if (filename === 'todas') {
+                    companyDB.tx_company_banners = [];
+                } else {
+                    companyDB.tx_company_banners = companyDB.tx_company_banners.filter(archivo => archivo != filename);
+                }
+                fileSystem.syncFolder(dirPath, companyDB.tx_company_banners);
+            }
+
+            if (idField === 'tx_company_logo') {
+                companyDB.tx_company_logo = null;
+                fileSystem.syncFolder(dirPath, []);
+            }
+
+
+            // ===================================================
+            // SINCRONIZO STORAGE EN HOSTINGER
+            // ===================================================
+            // Si mi ambiente de producción es Heroku tengo que sincronizar mi storage en Hostinger
+            // syncHostinger(dirPath).then(() =>).catch(err =>);
+            companyDB.save().then(companySaved => {
+                if (companySaved)
+                    return res.status(200).json({
+                        ok: true,
+                        msg: "Se elimino de la BD la imagen: " + filename,
+                        company: companySaved,
+                        filename: filename
+                    });
+            });
+        });
+    }
+
+    if (['tx_img'].includes(idField)) {
+        User.findByIdAndUpdate(idDocument, { tx_img: filename }).then(userDB => {
+
+            if (!userDB) {
+                return res.status(400).json({
+                    ok: false,
+                    msg: "No existe el usuario para la imagen que desea eliminar",
+                    user: null
+                });
+            }
+
+            var dirPath = `./uploads/${idDocument}/${idField}`;
+
+
+            if (idField === 'tx_img') {
+                userDB.tx_img = null;
+                fileSystem.syncFolder(dirPath, []);
+            }
+
+            // ===================================================
+            // SINCRONIZO STORAGE EN HOSTINGER
+            // ===================================================
+            // Si mi ambiente de producción es Heroku tengo que sincronizar mi storage en Hostinger
+            // syncHostinger(dirPath).then(() => ).catch(err => );
+            userDB.save().then(userSaved => {
+                if (userSaved)
+                    return res.status(200).json({
+                        ok: true,
+                        msg: "Se elimino de la BD la imagen: " + filename,
+                        user: userSaved,
+                        filename: filename
+                    });
+            });
+        })
+    }
+
+}
+
+function grabarImagenBD(idField: string, idDocument: string, archivoNombre: string, res: Response) {
+
     return new Promise((resolve) => {
 
-        //usuario 5c75c21b70933c1784cdc8db 5c75c21b70933c1784cdc8db-924.jpg ServerResponse {...}
-        if (txType === "logo") {
-            Company.findByIdAndUpdate(idCompany, { tx_company_logo: archivoNombre }).then(companyDB => {
-
-                if (!companyDB) {
-                    return resolve({
-                        ok: false,
-                        msg: "No existe el comercio solicitado",
-                        company: null
-                    })
-                }
-
-                //borro imagen vieja
-                var pathViejo = `./uploads/${idCompany}/${txType}/${companyDB.tx_company_logo}`;
-
-                if (fs.existsSync(pathViejo)) {
-                    fs.unlinkSync(pathViejo);
-                }
-
-                return resolve({
-                    ok: true,
-                    msg: "Logo actualizado correctamente",
-                    company: companyDB,
-                    filename: archivoNombre
-                });
-
-
-            }).catch(() => {
-                return resolve({
-                    ok: false,
-                    msg: 'Error al actualizar el nuevo logo',
-                    company: null
-                })
-            })
-        }
-
-        if (txType === "banner") {
-            let imagenesPermitidas = 12;
-            Company.findById(idCompany).then(companyDB => {
+        // Company collection
+        if (['tx_company_banners', 'tx_company_logo'].includes(idField)) {
+            Company.findById(idDocument).then(companyDB => {
 
                 if (!companyDB) {
                     return resolve({
@@ -146,94 +203,76 @@ function grabarImagenBD(txType: string, idCompany: string, archivoNombre: string
                     });
                 }
 
-                if (companyDB.tx_company_banners.length >= imagenesPermitidas) {
-                    return resolve({
-                        ok: false,
-                        msg: `Supera el máximo de ${imagenesPermitidas} imagenes permitidas`,
-                        company: null
-                    });
+
+                if (idField === 'tx_company_banners') {
+                    let imagenesPermitidas = 12;
+                    if (companyDB.tx_company_banners.length >= imagenesPermitidas) {
+                        return resolve({
+                            ok: false,
+                            msg: `Supera el máximo de ${imagenesPermitidas} imagenes permitidas`,
+                            company: null
+                        });
+                    }
+                    companyDB.tx_company_banners.push(archivoNombre);
                 }
 
+                if (idField === 'tx_company_logo') {
+                    companyDB.tx_company_logo = archivoNombre;
+                }
 
-                companyDB.tx_company_banners.push(archivoNombre);
                 companyDB.save().then(companySaved => {
-
                     if (!companySaved) {
                         return resolve({
                             // ERROR DE BASE DE DATOS
                             ok: false,
-                            msg: "No se pudo guardar el banner",
+                            msg: "No se pudo guardar la imagen",
                             company: null
                         });
                     }
-
                     return resolve({
                         ok: true,
-                        msg: "Banner guardado correctamente",
+                        msg: "Imagen guardada correctamente",
                         company: companySaved,
                         filename: archivoNombre
                     });
-
-
                 });
             });
 
         }
 
+        // User collection
+        if (['tx_img'].includes(idField)) {
+            User.findById(idDocument).then(UserDB => {
 
-    })
-
-}
-
-function deleteImagen(req: Request, res: Response) {
-    var txType = req.params.txType;
-    var idCompany = req.params.idCompany;
-    // Puede tomar el nombre del archivo o "TODAS" para elimnar todas las imagenes del aviso
-    var filename = req.params.filename;
-
-    
-
-        Company.findById(idCompany).then(companyDB => {
-
-            if (!companyDB) {
-                return res.status(400).json({
-                    ok: false,
-                    msg: "El aviso no existe",
-                    user: null
-                });
-            }
-
-            var dirPath = `./uploads/${idCompany}/${txType}`;
-
-            if (txType === 'banner') {
-                if (filename === 'todas') {
-                    companyDB.tx_company_banners = [];
-                } else {
-                    companyDB.tx_company_banners = companyDB.tx_company_banners.filter(archivo => archivo != filename);
-                }
-                fileSystem.syncFolder(dirPath, companyDB.tx_company_banners);
-            }
-
-            if (txType === 'logo' ) {
-                companyDB.tx_company_logo = 'default-logo.svg';
-                fileSystem.syncFolder(dirPath, []);
-            }
-
-            // ===================================================
-            // SINCRONIZO STORAGE EN HOSTINGER
-            // ===================================================
-            // Si mi ambiente de producción es Heroku tengo que sincronizar mi storage en Hostinger
-            // syncHostinger(dirPath).then(() => console.log('eliminado ok')).catch(err => console.log(err));
-            companyDB.save().then(companySaved => {
-                if (companySaved)
-                    return res.status(200).json({
-                        ok: true,
-                        msg: "Se elimino de la BD la imagen: " + filename,
-                        company: companySaved
+                if (!UserDB) {
+                    return resolve({
+                        ok: false,
+                        msg: "El comercio no existe",
+                        company: null
                     });
-            });
-        });
+                }
 
+                UserDB.tx_img = archivoNombre;
+
+                UserDB.save().then(userSaved => {
+                    if (!userSaved) {
+                        return resolve({
+                            // ERROR DE BASE DE DATOS
+                            ok: false,
+                            msg: "No se pudo guardar la imagen",
+                            user: null
+                        });
+                    }
+                    return resolve({
+                        ok: true,
+                        msg: "Imagen guardada correctamente",
+                        user: userSaved,
+                        filename: archivoNombre
+                    });
+                });
+            });
+        }
+    })
 }
 
 async function syncHostinger(pathdir: string) {
@@ -258,8 +297,6 @@ async function syncHostinger(pathdir: string) {
     client.close();
 
 }
-
-
 
 export = {
     uploadImagen,

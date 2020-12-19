@@ -48,7 +48,7 @@ interface User extends Document {
     id_company: string;
     id_role: string;
     cd_pricing: number;
-    tx_img: string;
+    tx_img: string | null;
     bl_google: boolean;
     tm_lastlogin: Date | null;
     tm_createdat: Date;

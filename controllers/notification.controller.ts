@@ -9,10 +9,10 @@ webpush.setVapidDetails(
     'mailto:matiasfrith@gmail.com', // por si los servicios cambian
     keys.publicKey,
     keys.privateKey
-  );
+);
 
 function notificationSubscribe(req: Request, res: Response) {
-    
+
 
     var body = req.body;
     body.expirationTime = + new Date().getTime() + 3600 * 24 * 7;
@@ -24,9 +24,9 @@ function notificationSubscribe(req: Request, res: Response) {
             msg: 'Subscripción a notificaciones exitosa',
             subscription: subscriptionSaved
         })
-    }).catch(()=>{
+    }).catch(() => {
         return res.status(400).json({
-            ok: false, 
+            ok: false,
             msg: 'No se pudo suscribir a las notificaciones',
             subscription: null
         })
@@ -38,7 +38,7 @@ function notificationSubscribe(req: Request, res: Response) {
 function notificationKey(req: Request, res: Response) {
     // return res.status(200).json({ 
     return res.status(200).send( // for encoding data with urlsafeBase64
-            getPublicKey()
+        getPublicKey()
     )
 }
 
@@ -53,16 +53,16 @@ function notificationPush(req: Request, res: Response) {
     Subscription.find({}).then(async (subscriptions: any) => {
         let subscriptors = subscriptions.length;
         for (let subscription of subscriptions) {
-        
+
             await webpush.sendNotification(subscription, JSON.stringify(post))
-            .then( () => console.log('Notificación enviada'))
-            .catch( () => {
-                subscriptors--;
-                subscription.remove().then((subscriptionRemoved: any) => {
-                })
-            });
+                .then(() => { })
+                .catch(() => {
+                    subscriptors--;
+                    subscription.remove().then((subscriptionRemoved: any) => {
+                    })
+                });
         }
-        
+
         return res.status(200).json({
             ok: true,
             msg: 'Notificaciones enviadas',

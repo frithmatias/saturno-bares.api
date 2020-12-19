@@ -12,22 +12,25 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/5.96a4579aeefdc71ca927.js',
-        '/6.8df5145d241a7ea0bf83.js',
-        '/7.021d95c1930f51b3fb95.js',
-        '/8.8b8c48c3c9a9c26ced2a.js',
-        '/9.bdd06dc13d97b169d4cb.js',
-        '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/main.92e0ff2aef38380c21d9.js',
+        '/5.6c012313cb771ed99792.js',
+        '/6.2fa94cf0b4d801731607.js',
+        '/7.ca6703664dee0d607d9f.js',
+        '/8.38feaeb8415bfa3351c1.js',
+        '/9.93a54ccbde3a002fb65e.js',
+        '/main.5122ff433fd1b6b7b559.js',
         '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.af963d2db7ffd8fd0502.js',
-        '/styles.ccbc3569c11b0a2483d5.css',
-        '/common.e1d7a0f30b6c988b1c09.js',
+        '/runtime.11e48ceb9ace8c4da024.js',
+        '/common.48003e8c52c17eb7a341.js',
+        '/styles.826473f80dbfd7d68a31.css',
+        '/bghome.2374cce18f9d245fa1a9.jpg',
+        '/heroku.b7e7f910d905c15ac7d6.svg',
+        '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
+        '/javascript.073149757fbeb5b24d7f.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/angular.5d5e9d7ac83c39d0c2bd.svg',
-        '/javascript.073149757fbeb5b24d7f.svg',
-        '/mongodb2.e69303ede457e4edd9c4.svg',
         '/typescript.a6305a733dd55243980a.svg'
+
+        
       ])
     })
     .catch(() => {
