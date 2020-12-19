@@ -1,6 +1,6 @@
-const CACHE_STATIC = 'static-0.2'
-const CACHE_DYNAMIC = 'dynamic-0.2'
-const CACHE_INMUTABLE = 'inmutable-0.2'
+const CACHE_STATIC = 'static-0.3'
+const CACHE_DYNAMIC = 'dynamic-0.3'
+const CACHE_INMUTABLE = 'inmutable-0.3'
 
 // ----------------------------------------------------------
 // app shell
@@ -12,16 +12,22 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/4.07e46f68e2f32cd306b7.js',
-        '/5.3e5c5a7720b33a53442d.js',
-        '/6.1b650ee2dde5f61999f3.js',
-        '/7.1490ced38eee230a4668.js',
-        '/8.48d7f559c9b2dbb1f040.js',
+        '/5.96a4579aeefdc71ca927.js',
+        '/6.8df5145d241a7ea0bf83.js',
+        '/7.021d95c1930f51b3fb95.js',
+        '/8.8b8c48c3c9a9c26ced2a.js',
+        '/9.bdd06dc13d97b169d4cb.js',
         '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/main.89779566d052f7eb0674.js',
-        '/polyfills.55e8b146f56f30089013.js',
-        '/runtime.b37cd90d15a62fb11fc5.js',
-        '/styles.5b5db6639820922d8dd8.css'
+        '/main.92e0ff2aef38380c21d9.js',
+        '/polyfills.e95903275e33ac0ccdfb.js',
+        '/runtime.af963d2db7ffd8fd0502.js',
+        '/styles.ccbc3569c11b0a2483d5.css',
+        '/common.e1d7a0f30b6c988b1c09.js',
+        '/nodejs.615ffbea9529ca7047ed.svg',
+        '/angular.5d5e9d7ac83c39d0c2bd.svg',
+        '/javascript.073149757fbeb5b24d7f.svg',
+        '/mongodb2.e69303ede457e4edd9c4.svg',
+        '/typescript.a6305a733dd55243980a.svg'
       ])
     })
     .catch(() => {
@@ -32,7 +38,6 @@ self.addEventListener('install', e => {
     .open(CACHE_INMUTABLE)
     .then(cache => {
       return cache.addAll([
-
         '/app.js',
         '/favicon.ico',
         '/manifest.json',
@@ -58,7 +63,6 @@ self.addEventListener('install', e => {
         '/assets/img/icons-ios/apple-launch-750x1334.png',
         '/assets/img/icons-ios/apple-launch-1125x2436.png',
         '/assets/img/icons-ios/apple-launch-1242x2208.png',
-
       ])
     })
     .catch(() => {

@@ -10,7 +10,7 @@ import { Table } from '../models/table.model';
 function createCompany(req: Request, res: Response) {
   // Save Company
   var body = req.body;
-  
+
   var company = new Company({
     id_user: body.id_user,
     tx_company_name: body.tx_company_name,
@@ -168,6 +168,36 @@ function updateCompany(req: Request, res: Response) {
 
 }
 
+function updateAbout(req: Request, res: Response) {
+
+  let idCompany = req.params.idCompany;
+  let txWelcome = req.body.txWelcome;
+
+  Company.findByIdAndUpdate(idCompany, { tx_company_welcome: txWelcome }, {new: true}).then(companyUpdated => {
+
+    if (!companyUpdated) {
+      return res.status(400).json({
+        ok: false,
+        msg: 'Error al actualizar datos secundarios del comercio',
+        company: null
+      })
+    }
+
+    return res.status(200).json({
+      ok: true,
+      msg: 'Datos secundarios del comercio actualizados correctamente',
+      company: companyUpdated
+    })
+
+  }).catch((err) => {
+    return res.status(400).json({
+      ok: false,
+      msg: { msg: 'Error al actualizar datos secundarios del comercio', detail: err},
+      company: null
+    })
+  })
+}
+
 function deleteCompany(req: Request, res: Response) {
 
   var idCompany = req.params.idCompany;
@@ -185,10 +215,11 @@ function deleteCompany(req: Request, res: Response) {
         childs: { users: resp[0], tables: resp[1] }
       }
     });
-  }).catch(() => {
+  }).catch((err) => {
     return res.status(400).json({
       ok: false,
-      msg: 'Error al eliminar la empresa o uno de sus vínculos'
+      msg: { msg: 'Error al eliminar la empresa o uno de sus vínculos', detail: err},
+      company: null
     });
   });
 }
@@ -225,6 +256,7 @@ export = {
   readCompanies,
   findCompany,
   updateCompany,
+  updateAbout,
   deleteCompany,
   checkCompanyExists
 }
