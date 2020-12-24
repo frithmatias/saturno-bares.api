@@ -32,19 +32,31 @@ async function getImage(req: Request, res: Response) {
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
-        var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
-        res.sendFile(pathNoImage);
+
+        downloadHTTP(idCompany, idType, idFile).then(() => {
+            if (fs.existsSync(pathImage)) {
+                res.sendFile(pathImage);
+            } else {
+                var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+                res.sendFile(pathNoImage);
+            }
+
+        }).catch(() => {
+            var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+            res.sendFile(pathNoImage);
+        })
+
     }
 }
 
 // Si el archivo no existe en Heroku lo busco en Hostinger.
-function downloadHTTP(idCompany: string, idFile: string): Promise<boolean> {
+function downloadHTTP(idCompany: string, idType: string, idFile: string): Promise<void> {
     return new Promise((resolve, reject) => {
         // creo nuevamente la carpeta de usuario en Heroku
-        fileSystem.createFolder(`./uploads/${idCompany}`);
+        fileSystem.createFolder(`./uploads/${idCompany}/${idType}`);
 
-        // hago la descarga de la imágen solicitada a heroku pero en Hostinger
-        const url = `http://www.satruno.fun/uploads/${idCompany}/${idFile}`;
+        // hago la descarga desde Hostinger de la imágen solicitada a heroku 
+        const url = `https://www.saturno.fun/uploads/${idCompany}/${idType}/${idFile}`;
 
         var download = (url: string, dest: string) => {
             var file = fs.createWriteStream(dest);
@@ -52,11 +64,11 @@ function downloadHTTP(idCompany: string, idFile: string): Promise<boolean> {
                 response.pipe(file);
                 file.on('finish', () => {
                     file.close(); // close() is async, call cb after close completes.
-                    resolve(true);
+                    resolve();
                 });
                 file.on('error', () => {
                     file.close(); // close() is async, call cb after close completes.
-                    reject(false);
+                    reject();
                 });
             }).on('error', (err: any) => { // Manejo el error
                 fs.unlink(dest, () => {
@@ -65,7 +77,7 @@ function downloadHTTP(idCompany: string, idFile: string): Promise<boolean> {
             });
         };
 
-        download(url, `./uploads/${idCompany}/${idFile}`);
+        download(url, `./uploads/${idCompany}${idType}/${idFile}`);
     });
 
 }

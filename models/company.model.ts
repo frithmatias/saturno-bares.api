@@ -6,7 +6,7 @@ const companySchema = new Schema({
     // company form
     id_user: { type: String, required: [true, 'El id_user es necesario'] },
     tx_company_name: { type: String, unique: true, required: [true, 'El tx_company_name es necesario'] },
-    tx_company_slogan: { type: String, default: false },
+    tx_company_slogan: { type: String, required: false },
     tx_company_string: { type: String, unique: true, required: [true, 'El tx_company_string es necesario'] },
     tx_company_location: { type: String, required: [true, 'El tx_company_location es necesario'] },
     cd_company_location: { type: String, required: [true, 'El cd_company_location es necesario'] },

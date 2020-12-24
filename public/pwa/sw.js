@@ -34,18 +34,12 @@ self.addEventListener('install', e => {
     .open(CACHE_INMUTABLE)
     .then(cache => {
       return cache.addAll([
-
         '/app.js',
         '/favicon.ico',
         '/manifest.json',
         '/assets/pwa.css',
         '/assets/bell.wav',
-        '/assets/img/noti-off.png',
-        '/assets/img/noti-on.png',
-        '/assets/img/saturn.png',
-        '/assets/img/myticket-background.png',
-        '/assets/img/saturno-menu.png',
-        '/assets/img/saturno-selector-empresas.png',
+        '/assets/img/map/duff-beer.svg',
         '/assets/img/icons/logo72x72.png',
         '/assets/img/icons/logo96x96.png',
         '/assets/img/icons/logo128x128.png',

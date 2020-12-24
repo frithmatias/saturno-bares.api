@@ -11,7 +11,7 @@ const companyRoutes = Router();
 
 companyRoutes.post('/create', mdAuth.verificaToken, CompanyController.createCompany);
 companyRoutes.post('/update', mdAuth.verificaToken, CompanyController.updateCompany);
-companyRoutes.put('/updateabout/:idCompany', mdAuth.verificaToken, CompanyController.updateAbout)
+companyRoutes.put('/updatewebpage/:idCompany', mdAuth.verificaToken, CompanyController.updateWebPage)
 companyRoutes.get('/readcompanies/:idUser', CompanyController.readCompanies);
 companyRoutes.get('/readcompany/:txCompanyString', CompanyController.readCompany);
 companyRoutes.get('/findcompany/:pattern', CompanyController.findCompany);

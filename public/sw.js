@@ -1,6 +1,6 @@
-const CACHE_STATIC = 'static-0.3'
-const CACHE_DYNAMIC = 'dynamic-0.3'
-const CACHE_INMUTABLE = 'inmutable-0.3'
+const CACHE_STATIC = 'static-0.7'
+const CACHE_DYNAMIC = 'dynamic-0.7'
+const CACHE_INMUTABLE = 'inmutable-0.7'
 
 // ----------------------------------------------------------
 // app shell
@@ -12,25 +12,25 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/5.6c012313cb771ed99792.js',
-        '/6.2fa94cf0b4d801731607.js',
-        '/7.ca6703664dee0d607d9f.js',
-        '/8.38feaeb8415bfa3351c1.js',
-        '/9.93a54ccbde3a002fb65e.js',
-        '/main.5122ff433fd1b6b7b559.js',
-        '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.11e48ceb9ace8c4da024.js',
-        '/common.48003e8c52c17eb7a341.js',
-        '/styles.826473f80dbfd7d68a31.css',
-        '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/heroku.b7e7f910d905c15ac7d6.svg',
-        '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
-        '/javascript.073149757fbeb5b24d7f.svg',
-        '/nodejs.615ffbea9529ca7047ed.svg',
+        '/5.667c44396bb2a4e5b683.js',
+        '/6.df5737ef022ec6602a79.js',
+        '/7.8a3e75abea513ba0e60f.js',
+        '/8.7ef00b83098f183a8f40.js',
+        '/9.b4732344aa817085fe90.js',
         '/angular.5d5e9d7ac83c39d0c2bd.svg',
+        '/beer.91e496f27f840ac8f95e.svg',
+        '/bghome.2374cce18f9d245fa1a9.jpg',
+        '/common.6427c796aedb4f6f55f5.js',
+        '/heroku.b7e7f910d905c15ac7d6.svg',
+        '/javascript.073149757fbeb5b24d7f.svg',
+        '/main.9db1f0e7cf83376e483c.js',
+        '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
+        '/nodejs.615ffbea9529ca7047ed.svg',
+        '/polyfills.e95903275e33ac0ccdfb.js',
+        '/runtime.378f62bf336ea5875dd3.js',
+        '/styles.2df5c8c369e08ba52367.css',
         '/typescript.a6305a733dd55243980a.svg'
 
-        
       ])
     })
     .catch(() => {
@@ -47,13 +47,6 @@ self.addEventListener('install', e => {
         '/assets/pwa.css',
         '/assets/bell.wav',
         '/assets/img/map/duff-beer.svg',
-        '/assets/img/map/marker-30.png',
-        '/assets/img/noti-off.png',
-        '/assets/img/noti-on.png',
-        '/assets/img/saturn.png',
-        '/assets/img/myticket-background.png',
-        '/assets/img/saturno-menu.png',
-        '/assets/img/saturno-selector-empresas.png',
         '/assets/img/icons/logo72x72.png',
         '/assets/img/icons/logo96x96.png',
         '/assets/img/icons/logo128x128.png',

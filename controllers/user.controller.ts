@@ -152,7 +152,8 @@ async function loginGoogle(req: Request, res: Response) {
                 .then(async userSaved => {
 
                   userSaved.tx_password = ":)";
-                  await obtenerMenu(userDB.id_role, userDB.cd_pricing).then(menu => {
+                  await obtenerMenu(userDB.id_role).then(menu => {
+
 
                     let home;
                     switch (userDB.id_role) {
@@ -217,7 +218,7 @@ async function loginGoogle(req: Request, res: Response) {
             user.save().then(async userSaved => {
 
               var token = Token.getJwtToken({ user });
-              await obtenerMenu(user.id_role, user.cd_pricing).then(menu => {
+              await obtenerMenu(user.id_role).then(menu => {
 
                 res.status(200).json({
                   ok: true,
@@ -227,7 +228,7 @@ async function loginGoogle(req: Request, res: Response) {
                   menu,
                   home: '/admin/home'
                 });
-              }).catch(()=> {
+              }).catch(() => {
                 res.status(500).json({
                   ok: false,
                   msg: 'Error al obtener el menu del usuario',
@@ -319,7 +320,7 @@ function loginUser(req: Request, res: Response) {
           body: body,
           id: userDB._id,
           user: userDB,
-          menu: await obtenerMenu(userDB.id_role, userDB.cd_pricing),
+          menu: await obtenerMenu(userDB.id_role),
           home
         });
 
@@ -343,7 +344,129 @@ function loginUser(req: Request, res: Response) {
 
 }
 
-function obtenerMenu(txRole: string, cdPricing: number = 0) {
+function obtenerMenu(txRole: string) {
+
+  return new Promise(resolve => {
+
+    let menu_return: any[] = [];
+
+    let menu_indicadores = {
+      ricing: 0,
+      tx_titulo: 'Indicadores',
+      tx_icon: 'mdi mdi-chart-box',
+      tx_url: '/metrics/dashboard',
+      subitems: [
+        {
+          tx_titulo: 'Ocio',
+          tx_url: '/metrics/ocio',
+          tx_icon: 'mdi  mdi-bell-sleep-outline'
+        }, {
+          tx_titulo: 'Cancelados',
+          tx_url: '/metrics/cancelados',
+          tx_icon: 'mdi mdi-book-remove-multiple-outline'
+        }, {
+          tx_titulo: 'Volúmen',
+          tx_url: '/metrics/volumen',
+          tx_icon: 'mdi mdi-bookmark-multiple-outline'
+        }, {
+          tx_titulo: 'Atención',
+          tx_url: '/metrics/atencion',
+          tx_icon: 'mdi mdi-account-clock-outline'
+        }, {
+          tx_titulo: 'Satisfacción',
+          tx_url: '/metrics/satisfaccion',
+          tx_icon: 'mdi mdi-emoticon-outline'
+        }, {
+          tx_titulo: 'Pendientesa',
+          tx_icon: 'mdi mdi-clock-alert-outline',
+          tx_url: '/metrics/pendientes',
+          __v: 0
+        }, {
+          tx_titulo: 'Puntualidad',
+          tx_icon: 'mdi mdi-clock-check-outline',
+          tx_url: '/metrics/puntualidad',
+          __v: 0
+        }
+      ]
+    };
+
+    let menu_admin = {
+      tx_titulo: 'Administrador',
+      tx_icon: 'mdi  mdi-shield-star',
+      tx_url: '/admin/dashboard',
+      subitems: [
+        {
+          tx_titulo: 'Home',
+          tx_url: '/admin/home',
+          tx_icon: 'mdi mdi-home'
+        }, {
+          tx_titulo: 'Mi Perfil',
+          tx_url: '/admin/profile',
+          tx_icon: 'mdi mdi-shield-star'
+        }, {
+          tx_titulo: 'Wizard',
+          tx_icon: 'mdi mdi-wizard-hat',
+          tx_url: '/admin/wizard',
+        }, {
+          tx_titulo: 'Web Page',
+          tx_icon: 'mdi   mdi-page-layout-header',
+          tx_url: '/admin/webpage'
+        }, {
+          tx_titulo: 'Comercios',
+          tx_url: '/admin/companies',
+          tx_icon: 'mdi  mdi-silverware-fork-knife'
+        }, {
+          tx_titulo: 'Sectores',
+          tx_url: '/admin/sections',
+          tx_icon: 'mdi mdi-select-group'
+        }, {
+          tx_titulo: 'Mesas',
+          tx_url: '/admin/tables',
+          tx_icon: 'mdi  mdi-table-furniture',
+        }, {
+          tx_titulo: 'Camareros',
+          tx_icon: 'mdi   mdi-face',
+          tx_url: '/admin/waiters'
+        }, {
+          tx_titulo: 'Encuestas',
+          tx_icon: 'mdi mdi-poll-box',
+          tx_url: '/admin/poll',
+        }
+      ]
+    };
+
+    let menu_waiter = {
+      tx_titulo: 'Camarero',
+      tx_icon: 'mdi mdi-face',
+      tx_url: '/assistant/dashboard',
+      subitems: [
+        {
+          tx_titulo: 'Home',
+          tx_url: '/waiter/home',
+          tx_icon: 'mdi mdi-home'
+        }, {
+          tx_titulo: 'Dashboard',
+          tx_url: '/waiter/dashboard',
+          tx_icon: 'mdi mdi-monitor-dashboard'
+        }, {
+          tx_titulo: 'Mi Sector',
+          tx_url: '/waiter/section',
+          tx_icon: 'mdi mdi-select-group'
+        }
+      ]
+    };
+
+    if (txRole === 'ADMIN_ROLE') {
+      menu_return.push(menu_admin, menu_waiter, menu_indicadores);
+    } else {
+      menu_return.push(menu_waiter);
+    }
+
+    resolve(menu_return);
+  })
+}
+
+function obtenerMenuDB(txRole: string, cdPricing: number = 0) {
 
   return new Promise((resolve, reject) => {
     var cdRole: number[] = [];
@@ -361,18 +484,18 @@ function obtenerMenu(txRole: string, cdPricing: number = 0) {
     let items: any[] = [];
     let subitems: any[] = [];
 
-    Menu.find({cd_role: { $in: cdRole } }).then((menuDB) => {
+    Menu.find({}).then((menuDB) => {
 
       items = menuDB.filter(item => item.id_parent === null);
       subitems = menuDB.filter(item => item.id_parent !== null);
-      
+
       // rompo la referencia la objeto de mongoose menuDB 
       let itemsNew = [...items.map((item) => {
         return { ...item._doc };
       })]
 
       for (let item of itemsNew) {
-        item.subitems = subitems.filter(subitem =>  String(item._id) === String(subitem.id_parent));
+        item.subitems = subitems.filter(subitem => String(item._id) === String(subitem.id_parent));
       }
 
       resolve(itemsNew);

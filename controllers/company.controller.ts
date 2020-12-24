@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Company } from '../models/company.model';
 import { User } from '../models/user.model';
 import { Table } from '../models/table.model';
+import { Section } from '../models/section.model';
 
 // ========================================================
 // Company Methods
@@ -148,7 +149,7 @@ function updateCompany(req: Request, res: Response) {
     tx_address_street: body.tx_address_street,
     tx_address_number: body.tx_address_number
 
-  }).then(companyDB => {
+  }, {new: true}).then(companyDB => {
 
     if (!companyDB) {
       return res.status(400).json({
@@ -168,7 +169,7 @@ function updateCompany(req: Request, res: Response) {
 
 }
 
-function updateAbout(req: Request, res: Response) {
+function updateWebPage(req: Request, res: Response) {
 
   let idCompany = req.params.idCompany;
   let txWelcome = req.body.txWelcome;
@@ -203,10 +204,11 @@ function deleteCompany(req: Request, res: Response) {
   var idCompany = req.params.idCompany;
 
   let users = User.deleteMany({ id_company: idCompany, id_role: 'ASSISTANT_ROLE' }).then(usersDeleted => usersDeleted)
-  let tables = Table.deleteMany({ id_company: idCompany }).then(usersDeleted => usersDeleted)
-  let company = Company.findByIdAndDelete(idCompany).then(usersDeleted => usersDeleted)
+  let tables = Table.deleteMany({ id_company: idCompany }).then(tablesDeleted => tablesDeleted)
+  let sections = Section.deleteMany({ id_company: idCompany}).then(sectionsDeleted => sectionsDeleted)
+  let company = Company.findByIdAndDelete(idCompany).then(companyDeleted => companyDeleted)
 
-  Promise.all([users, tables, company]).then(resp => {
+  Promise.all([users, tables, sections, company]).then(resp => {
     return res.status(200).json({
       ok: true,
       msg: 'La empresa y sus vínculos fueron eliminados correctamente',
@@ -256,7 +258,7 @@ export = {
   readCompanies,
   findCompany,
   updateCompany,
-  updateAbout,
+  updateWebPage,
   deleteCompany,
   checkCompanyExists
 }
