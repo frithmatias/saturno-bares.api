@@ -16,7 +16,7 @@ companyRoutes.get('/readcompanies/:idUser', CompanyController.readCompanies);
 companyRoutes.get('/readcompany/:txCompanyString', CompanyController.readCompany);
 companyRoutes.get('/findcompany/:pattern', CompanyController.findCompany);
 companyRoutes.post('/checkcompanyexists', CompanyController.checkCompanyExists);
-companyRoutes.delete('/deletecompany/:idCompany', CompanyController.deleteCompany);
+companyRoutes.delete('/deletecompany/:idCompany', mdAuth.verificaToken, CompanyController.deleteCompany);
 
 
 export default companyRoutes;

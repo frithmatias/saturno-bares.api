@@ -1,8 +1,7 @@
-
-
 # DO NOT REMOVE THIS LINE AND THE LINES BELLOW SSL_REDIRECT:saturno.fun
 RewriteEngine on
 RewriteCond %{HTTPS} off
+RewriteCond %{THE_REQUEST} !/uploads/ [NC]
 RewriteCond %{HTTP_HOST} (www\.)?saturno.fun
 RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 # DO NOT REMOVE THIS LINE AND THE LINES BELLOW SSL_REDIRECT:saturno.fun

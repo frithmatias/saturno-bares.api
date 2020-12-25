@@ -32,7 +32,6 @@ async function getImage(req: Request, res: Response) {
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
-
         downloadHTTP(idCompany, idType, idFile).then(() => {
             if (fs.existsSync(pathImage)) {
                 res.sendFile(pathImage);
@@ -56,7 +55,10 @@ function downloadHTTP(idCompany: string, idType: string, idFile: string): Promis
         fileSystem.createFolder(`./uploads/${idCompany}/${idType}`);
 
         // hago la descarga desde Hostinger de la imágen solicitada a heroku 
-        const url = `https://www.saturno.fun/uploads/${idCompany}/${idType}/${idFile}`;
+        // En el archivo HTACCESS deL storage server tengo que hacer una excepción que evite la redirección 
+        // a HTTPS para la carpeta uploads 
+        // RewriteCond %{THE_REQUEST} !/uploads/ [NC]
+        const url = `http://www.saturno.fun/uploads/${idCompany}/${idType}/${idFile}`;
 
         var download = (url: string, dest: string) => {
             var file = fs.createWriteStream(dest);
@@ -77,7 +79,7 @@ function downloadHTTP(idCompany: string, idType: string, idFile: string): Promis
             });
         };
 
-        download(url, `./uploads/${idCompany}${idType}/${idFile}`);
+        download(url, `./uploads/${idCompany}/${idType}/${idFile}`);
     });
 
 }

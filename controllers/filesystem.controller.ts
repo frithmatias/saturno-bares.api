@@ -16,6 +16,7 @@ function createFolder(dirPath: string) {
 }
 
 function syncFolder(dirPath: string, filesInDb: string[]): Promise<void> {
+   
     return new Promise(resolve => {
         if (fs.existsSync(dirPath)) {
             fs.readdirSync(dirPath).forEach((file, index) => {

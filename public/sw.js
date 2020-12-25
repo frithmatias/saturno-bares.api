@@ -1,6 +1,11 @@
 const CACHE_STATIC = 'static-0.7'
 const CACHE_DYNAMIC = 'dynamic-0.7'
 const CACHE_INMUTABLE = 'inmutable-0.7'
+=======
+const CACHE_STATIC = 'static-0.6'
+const CACHE_DYNAMIC = 'dynamic-0.6'
+const CACHE_INMUTABLE = 'inmutable-0.6'
+>>>>>>> ca6e080ace65ff6d6ffcfd30b1c415c85c3a1cc5
 
 // ----------------------------------------------------------
 // app shell
@@ -12,25 +17,25 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/5.667c44396bb2a4e5b683.js',
+        '/1.a0b4a767107d528c6bbe.js',
+        '/5.4dc7e75761c8a36fc3c1.js',
         '/6.df5737ef022ec6602a79.js',
-        '/7.8a3e75abea513ba0e60f.js',
+        '/7.f46284c88178d12effd4.js',
         '/8.7ef00b83098f183a8f40.js',
         '/9.b4732344aa817085fe90.js',
         '/angular.5d5e9d7ac83c39d0c2bd.svg',
         '/beer.91e496f27f840ac8f95e.svg',
         '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/common.6427c796aedb4f6f55f5.js',
         '/heroku.b7e7f910d905c15ac7d6.svg',
         '/javascript.073149757fbeb5b24d7f.svg',
-        '/main.9db1f0e7cf83376e483c.js',
+        '/main.1096effea208822ce2df.js',
         '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.378f62bf336ea5875dd3.js',
-        '/styles.2df5c8c369e08ba52367.css',
-        '/typescript.a6305a733dd55243980a.svg'
-
+        '/runtime.4d1323e56050a0f62344.js',
+        '/saturn.184b56313862bcdb61fa.svg',
+        '/styles.0b4afc04a149ab0969a5.css',
+        '/typescript.a6305a733dd55243980a.svg',
       ])
     })
     .catch(() => {

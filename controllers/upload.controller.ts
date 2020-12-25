@@ -8,7 +8,6 @@ const ftp = require("basic-ftp")
 import environment from '../global/environment';
 import { User } from '../models/user.model';
 
-
 // ========================================================
 // Upload Methods
 // ========================================================
@@ -22,13 +21,14 @@ async function uploadImagen(req: any, res: Response) {
 
     var idField = req.params.idField;
     var idDocument = req.params.idDocument;
+
     var idFieldsValid = ["tx_company_banners", "tx_company_logo", "tx_img"];
 
     if (!idFieldsValid.includes(idField)) {
         return res.status(400).json({
             ok: false,
             msg: "Error, tipo de imagen no valida.",
-            company: null
+            filename: null
         });
     }
 
@@ -36,19 +36,19 @@ async function uploadImagen(req: any, res: Response) {
         return res.status(500).json({
             ok: false,
             msg: "Error no hay archivos para subir.",
-            company: null
+            filename: null
         });
     }
 
-    if (!req.files.imagen?.size || req.files.imagen?.size > 102400) {
+    if (!req.files.imagen?.size || req.files.imagen?.size > 2097152) {
         return res.status(400).json({
             ok: false,
-            msg: 'El archivo no debe superar los 100k (102400b)',
-            company: null
+            msg: 'El archivo no debe superar los 2Mb (2097152b)',
+            filename: null
         })
     }
 
-    // Obtener nombre del archivo
+    // Obtener nombre del archivo1
     var archivo = req.files.imagen; //'imagen' es el nombre dado en body>form-data en POSTMAN
     var archivoPartes = archivo.name.split(".");
     var archivoExtension = archivoPartes[archivoPartes.length - 1];
@@ -61,7 +61,7 @@ async function uploadImagen(req: any, res: Response) {
             // ERROR DE BASE DE DATOS
             ok: false,
             msg: "Error, extension de archivo no valida.",
-            company: null
+            filename: null
         });
     }
 
@@ -79,47 +79,37 @@ async function uploadImagen(req: any, res: Response) {
             return res.status(500).json({
                 ok: false,
                 msg: "Error, no se pudo guardar el archivo.",
-                company: null
+                filename: fileName
             });
         }
     });
 
     // ==============================================================
-    // SYNC HOSTINGER FTP: envío las imagenes hacia hostinger por FTP
+    // SAVE IMAGE IN DB
     // ==============================================================
-    await syncHostinger(dirPath)
-        .then(() => {
-            // ==============================================================
-            // SAVE IMAGE IN DB
-            // ==============================================================
-            grabarImagenBD(idField, idDocument, fileName, res).then((resp: any) => {
-                if (!resp.ok) {
-                    if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-                    return res.status(400).json(resp)
-                }
-                return res.status(200).json(resp);
-            }).catch((resp) => {
-                if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-                return res.status(400).json(resp)
-            })
-        }).catch((err) => {
+
+    grabarImagenBD(idField, idDocument, fileName, res).then(async (resp: any) => {
+        if (!resp.ok) {
             if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-            return res.status(500).json({
-                ok: false,
-                msg: "Error al subir la imagen a Hostinger",
-                company: null
-            });
-        });
-
-
+            return res.status(400).json(resp)
+        }
+        return res.status(200).json(resp);
+    }).catch((resp) => {
+        if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+        return res.status(400).json(resp)
+    })
 
 }
+
+
 
 function deleteImagen(req: Request, res: Response) {
     var idField = req.params.idField;
     var idDocument = req.params.idDocument;
     // Puede tomar el nombre del archivo o "TODAS" para elimnar todas las imagenes del aviso
     var fileName = req.params.fileName;
+
+    // update filelds in COMPANY collection
 
     if (['tx_company_banners', 'tx_company_logo'].includes(idField)) {
         Company.findById(idDocument).then(companyDB => {
@@ -128,7 +118,7 @@ function deleteImagen(req: Request, res: Response) {
                 return res.status(400).json({
                     ok: false,
                     msg: "No existe el comercio para la imagen que desea eliminar",
-                    company: null
+                    filename: fileName
                 });
             }
 
@@ -149,38 +139,28 @@ function deleteImagen(req: Request, res: Response) {
                 fileSystem.syncFolder(dirPath, []);
             }
 
-
-
             companyDB.save().then(companySaved => {
 
                 if (!companySaved) {
                     return res.status(400).json({
                         ok: false,
                         msg: "No se pudo eliminar de la BD la imagen: " + fileName,
-                        company: companySaved,
                         filename: fileName
                     });
                 }
 
-                // ===================================================
-                // SINCRONIZO STORAGE EN HOSTINGER
-                // ===================================================
-                // Si mi ambiente de producción es Heroku tengo que sincronizar mi storage en Hostinger
-                syncHostinger(dirPath).then(() => {
-                    console.log('Banner eliminado en Hostinger correctamente');
-                }).catch(() => console.log('Error al borrar banner en Hostinger'));
-
-
                 return res.status(200).json({
                     ok: true,
-                    msg: "Se elimino de la BD la imagen: " + fileName,
-                    company: companySaved,
+                    msg: "Imagenes eliminadas correctamente",
                     filename: fileName
                 });
+
+ 
             });
         });
     }
 
+    // update filelds in USER collection
     if (['tx_img'].includes(idField)) {
         User.findByIdAndUpdate(idDocument, { tx_img: fileName }).then(userDB => {
 
@@ -188,7 +168,7 @@ function deleteImagen(req: Request, res: Response) {
                 return res.status(400).json({
                     ok: false,
                     msg: "No existe el usuario para la imagen que desea eliminar",
-                    user: null
+                    filename: fileName
                 });
             }
 
@@ -200,32 +180,22 @@ function deleteImagen(req: Request, res: Response) {
                 fileSystem.syncFolder(dirPath, []);
             }
 
-
-
             userDB.save().then(userSaved => {
+
                 if (!userSaved) {
                     return res.status(400).json({
                         ok: false,
                         msg: "No se pudo eliminar de la BD la imagen: " + fileName,
-                        user: userSaved,
                         filename: fileName
                     });
                 }
 
-                // ===================================================
-                // SINCRONIZO STORAGE EN HOSTINGER
-                // ===================================================
-                // Si mi ambiente de producción es Heroku tengo que sincronizar mi storage en Hostinger
-                syncHostinger(dirPath).then(() => {
-                    console.log('Logo de bar eliminado en Hostinger correctamente');
-                }).catch(() => console.log('Error al eliminar el logo del bar en Hostinger'));
-
                 return res.status(200).json({
                     ok: true,
-                    msg: "Se elimino de la BD la imagen: " + fileName,
-                    user: userSaved,
+                    msg: "Imagenes eliminadas correctamente",
                     filename: fileName
                 });
+
             });
         })
     }
@@ -244,7 +214,7 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                     return reject({
                         ok: false,
                         msg: "El comercio no existe",
-                        company: null
+                        filename: fileName
                     });
                 }
 
@@ -254,7 +224,7 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                         return reject({
                             ok: false,
                             msg: `Supera el máximo de ${imagenesPermitidas} imagenes permitidas`,
-                            company: null
+                            filename: fileName
                         });
                     }
                     companyDB.tx_company_banners.push(fileName);
@@ -265,17 +235,17 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                 }
 
                 companyDB.save().then(companySaved => {
+
                     if (!companySaved) {
                         return reject({
                             ok: false,
                             msg: "No se pudo guardar la imagen",
-                            company: null
+                            filename: fileName
                         });
                     }
                     return resolve({
                         ok: true,
                         msg: "Imagen guardada correctamente",
-                        company: companySaved,
                         filename: fileName
                     });
                 });
@@ -291,7 +261,7 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                     return reject({
                         ok: false,
                         msg: "El comercio no existe",
-                        company: null
+                        filename: fileName
                     });
                 }
 
@@ -303,13 +273,12 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                             // ERROR DE BASE DE DATOS
                             ok: false,
                             msg: "No se pudo guardar la imagen",
-                            user: null
+                            filename: fileName
                         });
                     }
                     return resolve({
                         ok: true,
                         msg: "Imagen guardada correctamente",
-                        user: userSaved,
                         filename: fileName
                     });
                 });
@@ -318,9 +287,14 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
     })
 }
 
-async function syncHostinger(dirPath: string): Promise<string> {
-    return new Promise(async (resolve, reject) => {
-        console.log('sincronizando ', dirPath)
+
+async function syncHostinger(req: Request, res: Response) {
+
+        let idDocument = req.body.idDocument;
+        let idField = req.body.idField;
+
+        let dirPath = `./uploads/${idDocument}/${idField}`
+
         const client = new ftp.Client();
         client.ftp.verbose = false; // true for console logs messages
         try {
@@ -333,16 +307,27 @@ async function syncHostinger(dirPath: string): Promise<string> {
             await client.ensureDir(dirPath);
             await client.clearWorkingDir();
             await client.uploadFromDir(dirPath);
-            resolve('');
+
+            client.close();
+
+            return res.status(200).json({
+                ok: true,
+                msg: 'Sincronizado con Hostinger correctamente'
+            })
         }
         catch (err) {
-            reject(err);
+
+            client.close();
+            return res.status(400).json({
+                ok: false,
+                msg: 'Error al Sincronizar con Hostinger'
+            })
         }
-        client.close();
-    })
+  
 }
 
 export = {
     uploadImagen,
-    deleteImagen
+    deleteImagen,
+    syncHostinger
 }
