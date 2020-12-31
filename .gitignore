@@ -1,3 +1,6 @@
 node_modules/
 uploads/
-global/environment.desar.ts
+global/environment.ts
+server/
+ssl/
+public/

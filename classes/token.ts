@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import environment from '../global/environment';
+import environment from '../global/environment.prod';
 
 export default class Token {
 

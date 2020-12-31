@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 
 import Token from '../classes/token';
-import environment from '../global/environment';
+import environment from '../global/environment.prod';
 
 import { User } from '../models/user.model';
 import { Menu } from '../models/menu.model';

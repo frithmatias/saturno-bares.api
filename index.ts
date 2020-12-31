@@ -28,23 +28,22 @@ import uploadRoutes from './routes/upload.routes';
 import imageRoutes from './routes/image.routes';
 
 
-import environment from './global/environment';
+import environment from './global/environment.prod';
 
 
 // SINGLETON
 // const server = new Server();
 const server = Server.instance; // obtenemos una nueva instancia de forma estática
 
-// force ssl
-server.app.use(function (req, res, next) {
-    let hostname = req.headers?.host?.split(':')[0] // localhost
-	
-	if(req.protocol === 'http' && hostname !== 'localhost') {
-        res.redirect('https://' + req.headers.host + req.url);
-    } else {
-		next()
-	}
-});
+// force ssl for api
+// server.app.use(function (req, res, next) {
+//     let hostname = req.headers?.host?.split(':')[0] // localhost
+// 	if(req.protocol === 'http' && hostname !== 'localhost') {
+//         res.redirect('https://' + req.headers.host + req.url);
+//     } else {
+// 		next()
+// 	}
+// });
 
 const publicPath = path.resolve(__dirname, '../public');
 server.app.use(express.static(publicPath));
@@ -82,7 +81,7 @@ server.start(() => {
 });
 
 // MONGO DB
-mongoose.connect(environment.DB_CONN_STR, {
+mongoose.connect(environment.MONGO_DB, {
 		useNewUrlParser: true,
 		useCreateIndex: true,
 		useUnifiedTopology: true,

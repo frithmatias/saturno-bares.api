@@ -1,15 +1,11 @@
-const CACHE_STATIC = 'static-0.7'
-const CACHE_DYNAMIC = 'dynamic-0.7'
-const CACHE_INMUTABLE = 'inmutable-0.7'
-=======
-const CACHE_STATIC = 'static-0.6'
-const CACHE_DYNAMIC = 'dynamic-0.6'
-const CACHE_INMUTABLE = 'inmutable-0.6'
->>>>>>> ca6e080ace65ff6d6ffcfd30b1c415c85c3a1cc5
+const CACHE_STATIC = 'static-0.8'
+const CACHE_DYNAMIC = 'dynamic-0.8'
+const CACHE_INMUTABLE = 'inmutable-0.8'
 
 // ----------------------------------------------------------
 // app shell
 // ----------------------------------------------------------
+
 self.addEventListener('install', e => {
   let static = caches
     .open(CACHE_STATIC)
@@ -17,25 +13,26 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/1.a0b4a767107d528c6bbe.js',
-        '/5.4dc7e75761c8a36fc3c1.js',
-        '/6.df5737ef022ec6602a79.js',
-        '/7.f46284c88178d12effd4.js',
-        '/8.7ef00b83098f183a8f40.js',
-        '/9.b4732344aa817085fe90.js',
+        '/1.efcbb8825b6808597c72.js',
+        '/6.39952ec394d8f60817bd.js',
+        '/7.9c44cdfad1549a074cf0.js',
+        '/8.8ca6c3f942dcd9088f1c.js',
+        '/9.ffeb638889db8c1a3562.js',
         '/angular.5d5e9d7ac83c39d0c2bd.svg',
         '/beer.91e496f27f840ac8f95e.svg',
         '/bghome.2374cce18f9d245fa1a9.jpg',
+        '/cup.e1f5187976b0bae910b5.svg',
         '/heroku.b7e7f910d905c15ac7d6.svg',
         '/javascript.073149757fbeb5b24d7f.svg',
-        '/main.1096effea208822ce2df.js',
+        '/main.3066187ab71c00275120.js',
         '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.4d1323e56050a0f62344.js',
-        '/saturn.184b56313862bcdb61fa.svg',
-        '/styles.0b4afc04a149ab0969a5.css',
+        '/restaurant.3ad69415a1b2164b2b2d.svg',
+        '/runtime.8f66bd49d275d1b1ef44.js',
+        '/styles.811e6857cb37ce671f58.css',
         '/typescript.a6305a733dd55243980a.svg',
+        '/5.bc1235bdccf2bcab0582.js',
       ])
     })
     .catch(() => {

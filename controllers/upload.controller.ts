@@ -5,7 +5,7 @@ import fileSystem from './filesystem.controller';
 import fs from 'fs';
 const ftp = require("basic-ftp")
 
-import environment from '../global/environment';
+import environment from '../global/environment.prod';
 import { User } from '../models/user.model';
 
 // ========================================================
@@ -40,10 +40,10 @@ async function uploadImagen(req: any, res: Response) {
         });
     }
 
-    if (!req.files.imagen?.size || req.files.imagen?.size > 2097152) {
+    if (!req.files.imagen?.size || req.files.imagen?.size > 5242880) {
         return res.status(400).json({
             ok: false,
-            msg: 'El archivo no debe superar los 2Mb (2097152b)',
+            msg: 'El archivo no debe superar los 5Mb',
             filename: null
         })
     }

@@ -5,6 +5,14 @@ import { ScoreItem } from '../models/scoreitem.model';
 import { Score } from '../models/score.model';
 import { Location } from '../models/location.model';
 
+
+function getInfo(req: Request, res: Response) {
+  return res.status(200).json({
+    ok: true,
+    msg: 'Server corriendo ok'
+  })
+}
+
 function getClientData(req: Request, res: Response) {
   var company = String(req.params.company);
 
@@ -183,6 +191,7 @@ function readPlacesInLocation(req: Request, res: Response) {
 }
 
 export = {
+  getInfo,
   getClientData,
   postContact,
   getScoreItems,
