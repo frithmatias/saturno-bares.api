@@ -18,17 +18,21 @@ export default class Server {
 	public app: express.Application;
 	public port: number;
 	public io: socketIO.Server;
-	private httpServer: http.Server;
+
+	// private httpServer: http.Server;
 	private httpsServer: https.Server;
 
 	private constructor() {
 		this.app = express();
 		this.port = environment.SERVER_PORT;
 		this.app.enable('trust proxy');
-		this.httpServer = new http.Server(this.app);
-		this.httpsServer = new https.Server(options, this.app)
-		http.Server
+		
+		// HTTP
+		// this.httpServer = new http.Server(this.app);
 		//this.io = socketIO(this.httpServer);
+
+		// HTTPS
+		this.httpsServer = new https.Server(options, this.app)
 		this.io = socketIO(this.httpsServer);
 
 		this.escucharSockets();
@@ -47,6 +51,8 @@ export default class Server {
 
 	start(callback: Function) {
 		// this.app.listen( this.port, callback );
+		// this.httpServer.listen(this.port);
 		this.httpsServer.listen(this.port);
+	
 	}
 }

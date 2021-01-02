@@ -13,26 +13,26 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/1.efcbb8825b6808597c72.js',
+        '/1.2018b14b10356bffd794.js',
+        '/5.918ac8406467eefb8208.js',
         '/6.39952ec394d8f60817bd.js',
-        '/7.9c44cdfad1549a074cf0.js',
+        '/7.07cf01b8137f26c6f4b6.js',
         '/8.8ca6c3f942dcd9088f1c.js',
-        '/9.ffeb638889db8c1a3562.js',
+        '/9.f97e07cfc6ef2cfffd1e.js',
         '/angular.5d5e9d7ac83c39d0c2bd.svg',
         '/beer.91e496f27f840ac8f95e.svg',
         '/bghome.2374cce18f9d245fa1a9.jpg',
         '/cup.e1f5187976b0bae910b5.svg',
         '/heroku.b7e7f910d905c15ac7d6.svg',
         '/javascript.073149757fbeb5b24d7f.svg',
-        '/main.3066187ab71c00275120.js',
+        '/main.11ab5d7fb25f0375cd66.js',
         '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.e95903275e33ac0ccdfb.js',
         '/restaurant.3ad69415a1b2164b2b2d.svg',
-        '/runtime.8f66bd49d275d1b1ef44.js',
-        '/styles.811e6857cb37ce671f58.css',
+        '/runtime.604785671801ae130e75.js',
+        '/styles.1096b3356b4a2e616ece.css',
         '/typescript.a6305a733dd55243980a.svg',
-        '/5.bc1235bdccf2bcab0582.js',
       ])
     })
     .catch(() => {

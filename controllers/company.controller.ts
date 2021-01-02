@@ -149,7 +149,7 @@ function updateCompany(req: Request, res: Response) {
     tx_address_street: body.tx_address_street,
     tx_address_number: body.tx_address_number
 
-  }, {new: true}).then(companyDB => {
+  }, { new: true }).then(companyDB => {
 
     if (!companyDB) {
       return res.status(400).json({
@@ -173,8 +173,21 @@ function updateWebPage(req: Request, res: Response) {
 
   let idCompany = req.params.idCompany;
   let txWelcome = req.body.txWelcome;
+  let txEmail = req.body.txEmail;
+  let txWhatsapp = req.body.txWhatsapp;
+  let txFacebook = req.body.txFacebook;
+  let txTwitter = req.body.txTwitter;
+  let txInstagram = req.body.txInstagram;
 
-  Company.findByIdAndUpdate(idCompany, { tx_company_welcome: txWelcome }, {new: true}).then(companyUpdated => {
+
+  Company.findByIdAndUpdate(idCompany, {
+    tx_email: txEmail,
+    tx_whatsapp: txWhatsapp,
+    tx_facebook: txFacebook,
+    tx_twitter: txTwitter,
+    tx_instagram: txInstagram,
+    tx_company_welcome: txWelcome
+  }, { new: true }).then(companyUpdated => {
 
     if (!companyUpdated) {
       return res.status(400).json({
@@ -193,7 +206,7 @@ function updateWebPage(req: Request, res: Response) {
   }).catch((err) => {
     return res.status(400).json({
       ok: false,
-      msg: { msg: 'Error al actualizar datos secundarios del comercio', detail: err},
+      msg: { msg: 'Error al actualizar datos secundarios del comercio', detail: err },
       company: null
     })
   })
@@ -205,7 +218,7 @@ function deleteCompany(req: Request, res: Response) {
 
   let users = User.deleteMany({ id_company: idCompany, id_role: 'ASSISTANT_ROLE' }).then(usersDeleted => usersDeleted)
   let tables = Table.deleteMany({ id_company: idCompany }).then(tablesDeleted => tablesDeleted)
-  let sections = Section.deleteMany({ id_company: idCompany}).then(sectionsDeleted => sectionsDeleted)
+  let sections = Section.deleteMany({ id_company: idCompany }).then(sectionsDeleted => sectionsDeleted)
   let company = Company.findByIdAndDelete(idCompany).then(companyDeleted => companyDeleted)
 
   Promise.all([users, tables, sections, company]).then(resp => {
@@ -220,7 +233,7 @@ function deleteCompany(req: Request, res: Response) {
   }).catch((err) => {
     return res.status(400).json({
       ok: false,
-      msg: { msg: 'Error al eliminar la empresa o uno de sus vínculos', detail: err},
+      msg: { msg: 'Error al eliminar la empresa o uno de sus vínculos', detail: err },
       company: null
     });
   });

@@ -2,7 +2,7 @@ import { Schema, model, Document } from 'mongoose';
 import uniqueValidator from 'mongoose-unique-validator';
 
 const companySchema = new Schema({
-    
+
     // company form
     id_user: { type: String, required: [true, 'El id_user es necesario'] },
     tx_company_name: { type: String, unique: true, required: [true, 'El tx_company_name es necesario'] },
@@ -16,12 +16,17 @@ const companySchema = new Schema({
     tx_address_number: { type: Number, required: [true, 'El tx_address_number es necesario'] },
 
     // about form
+    tx_email: { type: String, required: false },
+    tx_whatsapp: { type: String, required: false },
+    tx_facebook: { type: String, required: false },
+    tx_twitter: { type: String, required: false },
+    tx_instagram: { type: String, required: false },
     tx_company_welcome: { type: String, default: 'La Historia o presentación de tu comercio aquí' },
-
+    
     // uploader
     tx_company_logo: { type: String, required: false }, // busy, paused, idle, reserved 
     tx_company_banners: { type: [String], default: [] }, // busy, paused, idle, reserved 
-    
+
     // todo
     tm_start: { type: Date, required: false },
     tm_end: { type: Date, required: false },

@@ -353,8 +353,8 @@ function obtenerMenu(txRole: string) {
     let menu_indicadores = {
       ricing: 0,
       tx_titulo: 'Indicadores',
-      tx_icon: 'mdi mdi-chart-box',
       tx_url: '/metrics/dashboard',
+      tx_icon: 'mdi mdi-chart-box',
       subitems: [
         {
           tx_titulo: 'Ocio',
@@ -377,7 +377,7 @@ function obtenerMenu(txRole: string) {
           tx_url: '/metrics/satisfaccion',
           tx_icon: 'mdi mdi-emoticon-outline'
         }, {
-          tx_titulo: 'Pendientesa',
+          tx_titulo: 'Pendientes',
           tx_icon: 'mdi mdi-clock-alert-outline',
           tx_url: '/metrics/pendientes',
           __v: 0
@@ -392,8 +392,8 @@ function obtenerMenu(txRole: string) {
 
     let menu_admin = {
       tx_titulo: 'Administrador',
-      tx_icon: 'mdi  mdi-shield-star',
       tx_url: '/admin/dashboard',
+      tx_icon: 'mdi  mdi-shield-star',
       subitems: [
         {
           tx_titulo: 'Home',
@@ -437,8 +437,8 @@ function obtenerMenu(txRole: string) {
 
     let menu_waiter = {
       tx_titulo: 'Camarero',
+      tx_url: '/waiter/dashboard',
       tx_icon: 'mdi mdi-face',
-      tx_url: '/assistant/dashboard',
       subitems: [
         {
           tx_titulo: 'Home',
