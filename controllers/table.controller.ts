@@ -21,7 +21,7 @@ let createTable = (req: Request, res: Response) => {
         tx_satus: 'paused',
         id_session: null
     });
-    
+
     table.save().then((tableSaved) => {
         res.status(200).json({
             ok: true,
@@ -59,7 +59,7 @@ let readTables = (req: Request, res: Response) => {
                     path: 'id_session',
                     populate: { path: 'id_ticket' }
                 })
-                .sort({id_section:1,nm_table:1})
+                .sort({ id_section: 1, nm_table: 1 })
                 .then(tablesDB => {
                     if (!tablesDB) {
                         return res.status(200).json({
@@ -165,7 +165,7 @@ let assignTables = (req: Request, res: Response) => {
 
         const server = Server.instance;
         server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
-        server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
+        if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
         if (blPriority) {
             Table.find({
@@ -256,7 +256,7 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
             // 1. 'assigned' con priority true, 
             // 2. 'assigned' con priority false, 
             // 3. queued
-            
+
             // busco en toda la cola un prioritario
             let ticketPriority = ticketsDB.filter(ticket => ticket.bl_priority === true)[0];
             if (ticketPriority) {
@@ -274,7 +274,7 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
                         reject()
                     })
                 })
-            } 
+            }
 
             // Se comienza a reservar mesas de un requerido asignado SOLO cuando se encuentra en la PRIMERA posición 
             // y la mesa liberada le corresponde
@@ -294,8 +294,8 @@ let spmPull = (table: Table): Promise<spmPullResponse> => {
                         reject()
                     })
                 })
-            } 
-            
+            }
+
             // Si NO existe un ticket prioritario y el próximo en la cola NO es un asignado, 
             // entonces busco el primer ticket 'queued' que le sirva la mesa
             else {

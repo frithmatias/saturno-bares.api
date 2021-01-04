@@ -10,23 +10,18 @@ import mongoose from 'mongoose';
 // ROUTES
 import publicRoutes from './routes/public.routes';
 import ticketRoutes from './routes/ticket.routes';
-
 import superuserRoutes from './routes/superuser.routes';
 import userRoutes from './routes/user.routes';
-
 import companyRoutes from './routes/company.routes';
 import sectionRoutes from './routes/section.routes';
 import waiterRoutes from './routes/waiter.routes';
 import tableRoutes from './routes/table.routes';
 import scoreItemRoutes from './routes/scoreitem.routes';
-
-
 import notificationRoutes from './routes/notification.routes';
 import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
 import uploadRoutes from './routes/upload.routes';
 import imageRoutes from './routes/image.routes';
-
 
 import environment from './global/environment.prod';
 
@@ -73,8 +68,6 @@ server.app.use('/i', indicatorRoutes);
 server.app.use('/scoreitem', scoreItemRoutes);
 server.app.use('/uploads', uploadRoutes);
 server.app.use('/image', imageRoutes);
-
-
 
 server.start(() => {
 	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }

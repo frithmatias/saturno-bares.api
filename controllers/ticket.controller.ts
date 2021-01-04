@@ -102,8 +102,9 @@ function reassignTicket(req: Request, res: Response) {
 				ticket.save().then((ticketChildSaved) => {
 
 					const server = Server.instance;
-
-					server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
+					if (idSocket) {
+						server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
+					}
 					server.io.to(idCompany).emit('update-clients');
 
 					let ticketToUser = {
@@ -163,7 +164,7 @@ function attendedTicket(req: Request, res: Response) {
 	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null }, { new: true }).then(ticketAttended => {
 		if (ticketAttended) {
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
-			server.io.to(ticketAttended.id_socket_client).emit('update-clients');
+			if (ticketAttended.id_socket_client) { server.io.to(ticketAttended.id_socket_client).emit('update-clients'); }
 			return res.status(200).json({
 				ok: true,
 				msg: 'El llamado al camarero fue atendido.',
@@ -247,14 +248,14 @@ function endTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: + new Date().getTime() }, { new: true }).then((ticketCanceled) => {
 
-		if(!ticketCanceled){
+		if (!ticketCanceled) {
 			return res.status(400).json({
-				ok: false, 
+				ok: false,
 				msg: 'No se puedo cancelar el ticket',
 				ticket: ticketCanceled
 			})
 		}
-		
+
 		if (ticketCanceled?.id_session) {
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, habilito la mesa y cierro su sesión.
@@ -317,7 +318,7 @@ function endTicket(req: Request, res: Response) {
 
 function createTicket(req: Request, res: Response) {
 
-	const { idSocket, nmPersons, idSection } = req.body;
+	const { blContingent, idSocket, txName, nmPersons, idSection } = req.body;
 
 	const idDay = + new Date().getDate();
 	const idMonth = + new Date().getMonth() + 1;
@@ -375,7 +376,9 @@ function createTicket(req: Request, res: Response) {
 				id_section: idSection,
 				id_session: null,
 				nm_persons: nmPersons,
+				bl_contingent: blContingent,
 				bl_priority: false,
+				tx_name: txName,
 				tx_call: null,
 				tm_call: null,
 				tx_status: 'queued',
