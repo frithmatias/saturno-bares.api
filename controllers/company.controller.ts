@@ -3,6 +3,7 @@ import { Company } from '../models/company.model';
 import { User } from '../models/user.model';
 import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
+import { Settings } from '../models/settings.model';
 
 // ========================================================
 // Company Methods
@@ -29,10 +30,28 @@ function createCompany(req: Request, res: Response) {
 
   company.save().then((companySaved) => {
 
-    return res.status(200).json({
-      ok: true,
-      msg: 'Comercio creado correctamente',
-      company: companySaved
+
+    let defaultSettings = new Settings({
+      id_company: companySaved._id,
+      bl_spm_auto: true
+    })
+
+    defaultSettings.save().then(settingsSaved => {
+
+      return res.status(200).json({
+        ok: true,
+        msg: 'Comercio creado correctamente',
+        settings: settingsSaved,
+        company: companySaved
+      })
+    }).catch(() => {
+
+      return res.status(400).json({
+        ok: false,
+        msg: 'Error al guardar las configuraciones iniciales',
+        company: null
+      })
+
     })
 
   }).catch((err) => {

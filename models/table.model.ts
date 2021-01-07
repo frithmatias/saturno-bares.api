@@ -17,4 +17,6 @@ export interface Table extends Document {
     tx_status: string;
     id_session?: string | null;
 }
+
+
 export const Table = model<Table>('Table', tableSchema);

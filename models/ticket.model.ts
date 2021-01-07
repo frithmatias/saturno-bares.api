@@ -11,7 +11,7 @@ const ticketsSchema = new Schema({
     tx_call: {type: String, required: false, default: null},
     tm_call: { type: Number, required: false, default: null },
     tx_status: {type: String, required: [true, 'El tx_status es necesario'], default: 'queued'},
-    cd_tables: {type: [Number], required: false}, // only for requested and assigned tickets
+    cd_tables: {type: [Number], required: true, default: []}, // only for requested and assigned tickets
     id_position: {type: Number, required: [true, 'El id_position es necesario']},
     id_socket_client: {type: String, required: false},
     id_socket_waiter: {type: String, required: false},

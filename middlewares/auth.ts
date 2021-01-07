@@ -10,9 +10,10 @@ let verificaToken = (req: any, res: Response, next: NextFunction) => {
             next(); 
         })
         .catch((err) => {
+          console.log(err)
             res.status(401).json({
                 ok: false,
-                msg: 'La sesión expiró, inice sesión nuevamente.',
+                msg: 'La sesión expiró o no tiene permisos.',
                 code: 1001
             });
         });

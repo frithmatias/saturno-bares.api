@@ -400,6 +400,10 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/home',
           tx_icon: 'mdi mdi-home'
         }, {
+          tx_titulo: 'Settings',
+          tx_url: '/admin/settings',
+          tx_icon: 'mdi mdi-cog'
+        }, {
           tx_titulo: 'Mi Perfil',
           tx_url: '/admin/profile',
           tx_icon: 'mdi mdi-shield-star'

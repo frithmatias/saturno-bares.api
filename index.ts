@@ -22,6 +22,8 @@ import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
 import uploadRoutes from './routes/upload.routes';
 import imageRoutes from './routes/image.routes';
+import settingsRoutes from './routes/settings.routes';
+
 
 import environment from './global/environment.prod';
 
@@ -68,6 +70,8 @@ server.app.use('/i', indicatorRoutes);
 server.app.use('/scoreitem', scoreItemRoutes);
 server.app.use('/uploads', uploadRoutes);
 server.app.use('/image', imageRoutes);
+server.app.use('/settings', settingsRoutes);
+
 
 server.start(() => {
 	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }

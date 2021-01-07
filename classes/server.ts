@@ -34,7 +34,6 @@ export default class Server {
 		// HTTPS
 		this.httpsServer = new https.Server(options, this.app)
 		this.io = socketIO(this.httpsServer);
-
 		this.escucharSockets();
 	}
 
