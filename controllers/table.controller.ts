@@ -1,4 +1,4 @@
-import { Request, response, Response } from 'express';
+import { Request, Response } from 'express';
 import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { Ticket } from '../models/ticket.model';
@@ -169,7 +169,10 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
 let assignTables = (req: Request, res: Response) => {
 
-    var { isFirst, idTicket, cdTables, blPriority } = req.body;
+    var { idTicket, blPriority, blFirst, cdTables, idSection } = req.body;
+
+    // return res.status(200).json({ok:true})
+    // return;
 
     // 1. busco el ticket que quiero actualizar 
     // 2. verifico si des-asigna para evaluar el estado original 
@@ -187,11 +190,13 @@ let assignTables = (req: Request, res: Response) => {
             })
         }
 
-        let tables = await Table.find({ id_section: ticketDB.id_section })
+        // No puedo guardar el ticket y despues enviar a spm.push porque PUSH es un metodo para tickets de asignación 
+        // simple es decir pueden ser proveídos con una sóla mesa
+        let tables = await Table.find({ id_section: idSection })
         let compatibles = tables.filter(table => table.nm_persons >= ticketDB.nm_persons);
-        let newStatus;
 
-        if (cdTables.length === 0) {
+        let newStatus;
+        if (cdTables.length === 0) { // des-asigna a cero
             newStatus = compatibles.length === 0 ? 'requested' : 'queued';
         } else {
             newStatus = 'assigned';
@@ -200,6 +205,7 @@ let assignTables = (req: Request, res: Response) => {
         ticketDB.cd_tables = cdTables;
         ticketDB.tx_status = newStatus;
         ticketDB.bl_priority = blPriority;
+        ticketDB.id_section = idSection;
 
         ticketDB.save().then(ticketSaved => {
 
@@ -214,23 +220,19 @@ let assignTables = (req: Request, res: Response) => {
             server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
             if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
-            if (blPriority || isFirst) {
+
+            // assignTables es un método que llama el camarero cuando asigna mesas por lo tanto, TIENE que intentar 
+            // proveer mesas si le asigno al primero, o si es prioritario.
+            if (blPriority || blFirst) {
 
                 let tablesToProvide: Table[] = [];
-
-                if (ticketSaved.tx_status === 'queued') { // aprovisiono una mesa compatible
-                    tablesToProvide = [compatibles[0]];
-                } else if (ticketSaved.tx_status === 'assigned') { // intento aprovisionar la/las mesas asignadas
+                if (ticketSaved.tx_status === 'queued') {
+                    // selecciono la primer mesa compatible y disponible -> [0]
+                    let idles = compatibles.filter(table => table.tx_status === 'idle');
+                    tablesToProvide = [idles[0]]; 
+                } else if (ticketSaved.tx_status === 'assigned') {
+                    // selecciono las mesas asignadas en el ticket para aprovisionar
                     tablesToProvide = tables.filter(table => ticketDB.cd_tables?.includes(table.nm_table));
-                }
-
-                if (tablesToProvide.length === 0) {
-                    // se le dio prioridad a un ticket en estado 'requerido'
-                    return res.status(200).json({
-                        ok: true,
-                        msg: 'No hay mesas asignadas ni compatibles para proveer.',
-                        tables: compatibles[0]
-                    })
                 }
 
                 spm.provide(tablesToProvide, ticketSaved).then(() => {

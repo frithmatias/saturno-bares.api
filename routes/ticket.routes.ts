@@ -19,7 +19,6 @@ ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
 // waiter actions
 ticketRoutes.post('/endticket', ticketController.endTicket);
 ticketRoutes.post('/releaseticket', mdAuth.verificaToken, ticketController.releaseTicket);
-ticketRoutes.post('/reassignticket', mdAuth.verificaToken, ticketController.reassignTicket);
 ticketRoutes.post('/attendedticket', mdAuth.verificaToken, ticketController.attendedTicket);
 
 

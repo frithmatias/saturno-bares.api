@@ -400,7 +400,7 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/home',
           tx_icon: 'mdi mdi-home'
         }, {
-          tx_titulo: 'Settings',
+          tx_titulo: 'Ajustes',
           tx_url: '/admin/settings',
           tx_icon: 'mdi mdi-cog'
         }, {
@@ -513,7 +513,10 @@ function obtenerMenuDB(txRole: string, cdPricing: number = 0) {
 }
 
 function testData(req: Request, res: Response) {
-
+  const animal = 'alligator';
+  // Send a text/html file back with the word 'alligator' repeated 1000 times
+  res.send(animal.repeat(1000));
+  return;
   var user = User.findOne({ tx_email: 'matiasfrith@gmail.com' }, (err, userDB) => {
     return res.json({ data: userDB?.getData() });
   })

@@ -6,6 +6,7 @@ import cors from 'cors';
 import path from 'path';
 import express from 'express';
 import mongoose from 'mongoose';
+import compression from 'compression';
 
 // ROUTES
 import publicRoutes from './routes/public.routes';
@@ -49,13 +50,23 @@ server.app.use(express.static(publicPath));
 server.app.use(bodyParser.urlencoded({ extended: true }));
 server.app.use(bodyParser.json());
 
+
 // express-fileupload
 server.app.use(fileUpload());
 
 // CORS
 server.app.use(cors({ origin: true, credentials: true })); // permito que cualquier persona puede llamar mis servicios.
 
-// RUTAS
+
+// compress all responses
+//server.app.use(compression());
+
+
+server.app.get('/test', (req, res) => {
+	const animal = 'alligator';
+	// Send a text/html file back with the word 'alligator' repeated 1000 times
+	res.send(animal.repeat(100000));
+})
 server.app.use('/t', ticketRoutes);
 server.app.use('/p', publicRoutes);
 server.app.use('/superuser', superuserRoutes);
@@ -79,15 +90,15 @@ server.start(() => {
 
 // MONGO DB
 mongoose.connect(environment.MONGO_DB, {
-		useNewUrlParser: true,
-		useCreateIndex: true,
-		useUnifiedTopology: true,
-		useFindAndModify: false
-	})
+	useNewUrlParser: true,
+	useCreateIndex: true,
+	useUnifiedTopology: true,
+	useFindAndModify: false
+})
 	.then(() => {
 		console.log('MongoDB corriendo en el puerto 27017: \x1b[32m%s\x1b[0m', 'ONLINE');
 	})
 	.catch((err) => {
 		throw err;
-	}); 
+	});
 

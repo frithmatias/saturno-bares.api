@@ -1,10 +1,11 @@
-const CACHE_STATIC = 'static-0.1'
-const CACHE_DYNAMIC = 'dynamic-0.1'
-const CACHE_INMUTABLE = 'inmutable-0.1'
+const CACHE_STATIC = 'static-0.8'
+const CACHE_DYNAMIC = 'dynamic-0.8'
+const CACHE_INMUTABLE = 'inmutable-0.8'
 
 // ----------------------------------------------------------
 // app shell
 // ----------------------------------------------------------
+
 self.addEventListener('install', e => {
   let static = caches
     .open(CACHE_STATIC)
@@ -12,18 +13,26 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/index.html',
-        '/5.73d218b339185990b323.js',
-        '/6.ccfb61d9f68ff96397ed.js',
-        '/7.c275c6b7b00b4bc2fb3a.js',
-        '/8.f8661b12f754a98e0305.js',
-        '/9.02a5d4c7adaec350bf6a.js',
+        '/1.9feead0338faa404a4fe.js',
+        '/5.bf956a16ffa6c01ebf53.js',
+        '/6.29eb4445c030fdc256c3.js',
+        '/7.db66503bc1d41c8248c5.js',
+        '/8.fb85cc393f48b40708e5.js',
+        '/9.b164763ab1f028cd5d07.js',
+        '/angular.5d5e9d7ac83c39d0c2bd.svg',
+        '/beer.91e496f27f840ac8f95e.svg',
         '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/common.ae338539bf7110378eb0.js',
-        '/main.4d2161a1cc88caf75360.js',
+        '/cup.e1f5187976b0bae910b5.svg',
+        '/heroku.b7e7f910d905c15ac7d6.svg',
+        '/javascript.073149757fbeb5b24d7f.svg',
+        '/main.ec13d540915c873036b8.js',
+        '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
+        '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.e95903275e33ac0ccdfb.js',
-        '/runtime.2b307d74ec58ba520a88.js',
-        '/styles.7637f898928a6aad62ce.css'
+        '/restaurant.3ad69415a1b2164b2b2d.svg',
+        '/runtime.34645d9f6795982f7138.js',
+        '/styles.9bc9dbfc5a90c8521c39.css',
+        '/typescript.a6305a733dd55243980a.svg',
       ])
     })
     .catch(() => {
@@ -52,7 +61,6 @@ self.addEventListener('install', e => {
         '/assets/img/icons-ios/apple-launch-750x1334.png',
         '/assets/img/icons-ios/apple-launch-1125x2436.png',
         '/assets/img/icons-ios/apple-launch-1242x2208.png',
-
       ])
     })
     .catch(() => {

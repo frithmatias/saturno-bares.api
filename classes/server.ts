@@ -5,7 +5,7 @@ import https from 'https';
 import fs from 'fs';
 import * as socket from '../sockets/sockets';
 import environment from '../global/environment.prod';
-
+import zlib from 'zlib';
 
 const options = {
 	key: fs.readFileSync('ssl/private.key'),
@@ -25,15 +25,17 @@ export default class Server {
 	private constructor() {
 		this.app = express();
 		this.port = environment.SERVER_PORT;
-		this.app.enable('trust proxy');
+
+		// this.app.enable('trust proxy');
 		
 		// HTTP
 		// this.httpServer = new http.Server(this.app);
-		//this.io = socketIO(this.httpServer);
+		// this.io = socketIO(this.httpServer);
 
 		// HTTPS
 		this.httpsServer = new https.Server(options, this.app)
 		this.io = socketIO(this.httpsServer);
+
 		this.escucharSockets();
 	}
 

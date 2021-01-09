@@ -6,7 +6,6 @@ import spm from '../classes/spm';
 import { Ticket } from '../models/ticket.model';
 import { Position } from '../models/position.model';
 import { Table } from '../models/table.model';
-import { sectionSession } from '../models/section.session.model';
 import { Section } from '../models/section.model';
 import { TableSession } from '../models/table.session.model';
 import { Settings } from '../models/settings.model';
@@ -16,150 +15,6 @@ const server = Server.instance; // singleton
 // ========================================================
 // waiter methods
 // ========================================================
-
-function reassignTicket(req: Request, res: Response) {
-	// desvía un ticket de una session de msa a otranuevo session. 
-
-	const { idTicket, idSession, blPriority } = req.body;
-
-	const idDay = + new Date().getDate();
-	const idMonth = + new Date().getMonth() + 1;
-	const idYear = + new Date().getFullYear();
-
-	let idPosition: number;
-
-	Ticket.findById(idTicket).then(ticketDB => {
-
-		if (!ticketDB) {
-			return res.status(400).json({
-				ok: false,
-				msg: 'No existe el ticket a reenviar',
-				ticket: null
-			})
-		}
-
-		sectionSession.findById(idSession).then((sessionDB) => {
-
-			if (!sessionDB) {
-				return res.status(400).json({
-					ok: false,
-					msg: 'No existe el session solicitado',
-					ticket: null
-				})
-			}
-
-			// busco la posición que le corresponde
-			Position.findOneAndUpdate({
-				id_session: idSession,
-				id_year: idYear,
-				id_month: idMonth,
-				id_day: idDay
-			}, { $inc: { id_position: 1 } }, { new: true }).then((sessionNextNumber) => {
-
-				if (!sessionNextNumber) {
-					// si no existe el primer turno lo crea
-
-					let newSessionNumber = new Position({
-						id_session: idSession,
-						id_year: idYear,
-						id_month: idMonth,
-						id_day: idDay,
-						id_position: 1
-					})
-
-					newSessionNumber.save()
-						.catch(() => {
-							return res.status(400).json({
-								ok: false,
-								msg: "El nuevo status no se pudo guardar."
-							});
-						})
-
-					idPosition = newSessionNumber.id_position;
-				}
-
-				if (sessionNextNumber) {
-					idPosition = sessionNextNumber.id_position;
-				}
-
-
-
-				let idCompany = ticketDB.id_company;
-				let idSocket = ticketDB.id_socket_client;
-
-				// guardo el ticket
-
-				let ticket = new Ticket({
-					id_company: idCompany,
-					id_session: idSession,
-					id_position: idPosition,
-					bl_priority: blPriority,
-					id_socket_client: idSocket,
-					id_socket_waiter: null,
-					tm_start: + new Date().getTime(),
-					tm_att: null,
-					tm_end: null
-				})
-
-				ticket.save().then((ticketChildSaved) => {
-
-					const server = Server.instance;
-					if (idSocket) {
-						server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
-					}
-					server.io.to(idCompany).emit('update-clients');
-
-					let ticketToUser = {
-						id_session: idSession,
-						id_position: ticketChildSaved.id_position,
-						bl_priority: blPriority,
-						id_socket_client: ticketChildSaved.id_socket_client,
-						id_socket_waiter: null,
-						tm_start: ticketChildSaved.tm_start,
-						tm_att: null,
-						tm_end: null
-					}
-
-					res.status(201).json({
-						ok: true,
-						msg: "Ticket guardado correctamente.",
-						ticket: ticketToUser
-					});
-
-					// después de guardar el nuevo ticket, cierro el anterior
-					ticketDB.tm_end = + new Date().getTime();
-					ticketDB.save().catch(() => {
-						return res.status(400).json({
-							ok: false,
-							msg: 'Error al cerrar el ticket anterior',
-							ticket: false
-						});
-					})
-
-				}).catch(() => {
-
-					return res.status(400).json({
-						ok: false,
-						msg: 'Error al abrir el ticket nuevo',
-						ticket: false
-					});
-
-				})
-			}).catch(() => {
-				return res.status(400).json({
-					ok: false,
-					msg: "Error al procesar el status de los tickets para la empresa."
-				});
-			})
-		}).catch(() => {
-			return res.status(400).json({
-				ok: false,
-				msg: 'No se pudo obtener el session solicitado',
-				ticket: null
-			})
-		})
-	})
-};
 
 function attendedTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
@@ -408,7 +263,6 @@ function createTicket(req: Request, res: Response) {
 			
 				// envío pedido de actualización despues del push
 				const server = Server.instance;
-				console.log('pedido de actualización')
 				server.io.to(idSocket).emit('message-private', { msg: 'Bienvenido, puede realizar culquier consulta por aquí. Gracias por esperar.' });
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
@@ -578,7 +432,6 @@ export = {
 	createTicket,
 	callWaiter,
 	releaseTicket,
-	reassignTicket,
 	attendedTicket,
 	endTicket,
 	readTickets,

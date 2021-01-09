@@ -37,6 +37,7 @@ export default class Spm {
     private constructor() { }
 
     // a partir de un ticket 'queued' busca mesa 'idle' si encuentra la pasa a spmProvide
+    // este método queda sin efecto en modo MANUAL (bl_spm_auto=false)
     public static push = (ticket: Ticket): Promise<string> => {
 
         return new Promise((resolve, reject) => {
@@ -66,26 +67,6 @@ export default class Spm {
                     resolve(respProvide);
                     return;
 
-                    // hay disponibilidad se aprovisiona
-                    // let session = new TableSession();
-                    // session.id_tables = idleTables[0]._id;
-                    // session.id_ticket = ticket._id;
-                    // session.tm_start = + new Date();
-                    // session.save().then(sessionSaved => {
-                    //     idleTables[0].tx_status = 'busy';
-                    //     idleTables[0].id_session = sessionSaved._id;
-                    //     idleTables[0].save().then(tableSaved => {
-                    //         ticket.tx_status = 'provided';
-                    //         ticket.id_session = sessionSaved._id;
-                    //         ticket.tx_call = 'card'; // pide la carta
-                    //         ticket.tm_call = + new Date();
-                    //         ticket.tm_provided = + new Date();
-                    //         ticket.save().then(ticketProvided => {
-                    //             resolve('Push: Aprovisionamiento ok');
-                    //             return;
-                    //         })
-                    //     })
-                    // })
 
                 }
 
@@ -215,6 +196,7 @@ export default class Spm {
     // 'privided' y las mesas en estado 'reserved' cuando completa las pone en 'busy', si es una sola 
     // aprovisiona directamente.
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
+
         return new Promise(async (resolve, reject) => {
 
             // se reservan las mesas asignadas al ticket 

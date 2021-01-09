@@ -296,7 +296,7 @@ async function syncHostinger(req: Request, res: Response) {
         let dirPath = `./uploads/${idDocument}/${idField}`
 
         const client = new ftp.Client();
-        client.ftp.verbose = false; // true for console logs messages
+        client.ftp.verbose = false; 
         try {
             await client.access({
                 host: environment.FTP_HOST,
