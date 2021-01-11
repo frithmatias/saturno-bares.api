@@ -1,5 +1,8 @@
 import { Request, response, Response } from 'express';
 import { Settings } from '../models/settings.model';
+import Server from '../classes/server';
+
+const server = Server.instance; // singleton
 
 // ========================================================
 // Setting Methods
@@ -37,7 +40,26 @@ function updateSettings(req: Request, res: Response) {
     })
 }
 
+let sendMessage = (req: Request, res: Response): void => {
+
+    let txMessage = String(req.body.txMessage);
+    let idCompany = String(req.body.idCompany);
+
+
+    if (txMessage && txMessage.length <= 100) {
+        server.io.to(idCompany).emit('message-system', txMessage)
+        console.log(txMessage.length)
+        res.status(200).json({
+            ok: true,
+            msg: 'Mensaje enviado correctemante', 
+            text: null
+        })
+    }
+
+}
+
 export = {
     readSettings,
-    updateSettings
+    updateSettings,
+    sendMessage
 }

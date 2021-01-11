@@ -10,5 +10,5 @@ import SettingsController from '../controllers/settings.controller';
 const settingsRoutes = Router();
 settingsRoutes.get('/readsettings/:idCompany', mdAuth.verificaToken, SettingsController.readSettings);
 settingsRoutes.put('/updatesettings', mdAuth.verificaToken, SettingsController.updateSettings);
-
+settingsRoutes.post('/sendmessage', mdAuth.verificaToken, SettingsController.sendMessage);
 export default settingsRoutes;

@@ -7,8 +7,8 @@ import { Settings } from '../models/settings.model';
 // PUSH(), PULL() Y PROVIDE()
 
 // spm.push() 
-// a partir del ticket busca una mesa con estado 'idle' y verifica si existe COMPATIBLE, si no 
-// existe guardo el ticket como 'requested', si existe verifico si hay mesa DISPONIBLE, si no existe 
+// a partir del ticket busca una mesa COMPATIBLE, si no 
+// existe guardo el ticket como 'requested' si existe verifico si hay mesa DISPONIBLE, si no existe 
 // existe guardo el ticket como 'queued' y si existe y es compatible y disponible se lo pasa a provide().
 
 // spm.pull() 
@@ -32,7 +32,6 @@ import { Settings } from '../models/settings.model';
 // assignTables() -> asingación manual de mesas -> provide() [OK]
 
 export default class Spm {
-
 
     private constructor() { }
 
@@ -67,7 +66,6 @@ export default class Spm {
                     resolve(respProvide);
                     return;
 
-
                 }
 
             }).catch(() => {
@@ -99,7 +97,7 @@ export default class Spm {
             }).then(async ticketsDB => {
 
                 // No hay tickets en espera la mesa queda IDLE.
-                if (ticketsDB.length === 0) { return resolve('Pull: No hay tickets') }
+                if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
 
                 // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
 
@@ -125,7 +123,6 @@ export default class Spm {
                 // obtengo las configuraciones para el comercio
                 const settings = await Settings.findOne({ id_company: ticketsDB[0].id_company });
 
-                // Criterios de búsqueda según modo SPM autómático o manual
                 if (settings?.bl_spm_auto) {
                     // AUTO ON
                     // 2A.
@@ -156,10 +153,8 @@ export default class Spm {
 
                 }
 
-                // se encontró un ticket para la mesa
                 if (ticketSelected) {
 
-                    // si es 'assigned' puede tener mas de una mesa, busco el resto de las mesas asignadas
                     if (ticketSelected.tx_status === 'assigned') {
                         Table.find({
                             id_section: table.id_section,
@@ -173,7 +168,6 @@ export default class Spm {
                         })
                     }
 
-                    // si es un 'queued' se trata de una provisión simple, una sola mesa
                     else if (ticketSelected.tx_status === 'queued') {
                         Spm.provide([table], ticketSelected).then((resp: string) => {
                             return resolve(resp)
@@ -192,14 +186,11 @@ export default class Spm {
         })
     }
 
-    // a partir de un ticket y un array de mesas o array de una sola mesa, pone el ticket en estado 
-    // 'privided' y las mesas en estado 'reserved' cuando completa las pone en 'busy', si es una sola 
-    // aprovisiona directamente.
+
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
 
         return new Promise(async (resolve, reject) => {
 
-            // se reservan las mesas asignadas al ticket 
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
@@ -211,15 +202,13 @@ export default class Spm {
             }
 
             let tablesReservedCount = tables.filter(table => table.tx_status === 'reserved').length;
-            if (tablesReservedCount === ticket.cd_tables?.length) {
-                allReserved = true;
-            }
+
+            allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
 
             if (ticket.tx_status === 'assigned' && !allReserved) {
-                return resolve('Mesas reservadas esperando el resto...')
+                return resolve(`Se reservaron ${tablesReservedCount} de ${ticket.cd_tables?.length} mesas para el ticket ${ticket.id_position} de ${ticket.tx_name}`)
             }
 
-            // si reservó todas las mesas, o el ticket es 'queued' y sólo requiere de una sola mesa aprovisiona
             if ((ticket.tx_status === 'assigned' && allReserved) || (ticket.tx_status === 'queued')) {
 
                 let session = new TableSession();
@@ -232,15 +221,16 @@ export default class Spm {
                     for (let [index, table] of tables.entries()) {
                         table.tx_status = 'busy';
                         table.id_session = sessionSaved._id;
-                        await table.save().then(tableSaved => {
+
+                        await table.save().then(async tableSaved => {
                             ticket.tx_status = 'provided';
                             ticket.id_session = tableSaved.id_session;
                             ticket.tx_call = 'card'; // pide la carta
                             ticket.tm_call = + new Date();
                             ticket.tm_provided = + new Date();
-                            ticket.save().then(ticketSaved => {
+                            await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
-                                    return resolve('Pull: Aprovisionamiento ok');
+                                    return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }
                             }).catch(() => reject('Error guardando nuevo estado de ticket'))
                         }).catch(() => reject('Error guardando nuevo estado de mesa'))
