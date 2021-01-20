@@ -19,7 +19,7 @@ function getClientData(req: Request, res: Response) {
   Company.findOne({ tx_company_name: company }).then(companyDB => {
 
     if (!companyDB) {
-      return res.status(400).json({
+      return res.status(200).json({
         ok: false,
         msg: "No existe la empresa",
         company: null

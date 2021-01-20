@@ -82,10 +82,10 @@ export default class Spm {
 
         return new Promise((resolve, reject) => {
 
-            let year = + new Date().getFullYear();
-            let month = + new Date().getMonth();
-            let day = + new Date().getDate();
-            let time = + new Date(year, month, day).getTime();
+            let year = new Date().getFullYear();
+            let month = new Date().getMonth();
+            let day = new Date().getDate();
+            let time = new Date(year, month, day);
 
             // busco el primer turno (sin filtro por cantidad de comensales)
             Ticket.find({
@@ -94,7 +94,7 @@ export default class Spm {
                 tm_provided: null,
                 tm_att: null,
                 tm_end: null
-            }).then(async ticketsDB => {
+            }).then(async (ticketsDB: Ticket[]) => {
 
                 // No hay tickets en espera la mesa queda IDLE.
                 if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
@@ -114,7 +114,7 @@ export default class Spm {
                 let ticketSelected: Ticket;
 
                 // 1. (AUTO ON AND OFF)
-                ticketSelected = ticketsDB.filter(ticket =>
+                ticketSelected = ticketsDB.filter((ticket: Ticket) =>
                     ticket.tx_status === 'assigned' &&
                     ticket.cd_tables?.includes(table.nm_table) &&
                     ticket.bl_priority === true
@@ -127,7 +127,7 @@ export default class Spm {
                     // AUTO ON
                     // 2A.
                     if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter(ticket =>
+                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
                             ticket.tx_status === 'queued' &&
                             ticket.nm_persons <= table.nm_persons &&
                             ticket.bl_priority === true
@@ -136,7 +136,7 @@ export default class Spm {
 
                     // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' de características compatibles con la mesa 
                     if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter(ticket =>
+                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
                             (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table)) ||
                             (ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)
                         )[0];
@@ -146,7 +146,7 @@ export default class Spm {
                     // AUTO OFF
                     // 2B. primer 'assigned' que le corresponda la mesa 
                     if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter(ticket =>
+                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
                             (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table))
                         )[0];
                     }
@@ -156,6 +156,8 @@ export default class Spm {
                 if (ticketSelected) {
 
                     if (ticketSelected.tx_status === 'assigned') {
+                        
+                        // busco TODAS las mesas en el ticket
                         Table.find({
                             id_section: table.id_section,
                             nm_table: { $in: ticketSelected.cd_tables }
@@ -226,8 +228,8 @@ export default class Spm {
                             ticket.tx_status = 'provided';
                             ticket.id_session = tableSaved.id_session;
                             ticket.tx_call = 'card'; // pide la carta
-                            ticket.tm_call = + new Date();
-                            ticket.tm_provided = + new Date();
+                            ticket.tm_call = new Date();
+                            ticket.tm_provided = new Date();
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);

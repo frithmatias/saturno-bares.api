@@ -15,6 +15,7 @@ function createCompany(req: Request, res: Response) {
 
   var company = new Company({
     id_user: body.id_user,
+    tx_company_type: body.tx_company_type,
     tx_company_name: body.tx_company_name,
     tx_company_slogan: body.tx_company_slogan,
     tx_company_string: body.tx_company_string,
@@ -72,7 +73,7 @@ function readCompany(req: Request, res: Response) {
   Company.findOne({ tx_company_string: txCompanyString }).then(companyDB => {
 
     if (!companyDB) {
-      return res.status(400).json({
+      return res.status(200).json({
         ok: false,
         msg: "No existe la empresa",
         company: null
@@ -158,6 +159,7 @@ function updateCompany(req: Request, res: Response) {
 
   Company.findByIdAndUpdate(body._id, {
 
+    tx_company_type: body.tx_company_type,
     tx_company_name: body.tx_company_name,
     tx_company_slogan: body.tx_company_slogan,
     tx_company_string: body.tx_company_string,
@@ -193,6 +195,7 @@ function updateWebPage(req: Request, res: Response) {
   let idCompany = req.params.idCompany;
   let txWelcome = req.body.txWelcome;
   let txEmail = req.body.txEmail;
+  let txTelegram = req.body.txTelegram;
   let txWhatsapp = req.body.txWhatsapp;
   let txFacebook = req.body.txFacebook;
   let txTwitter = req.body.txTwitter;
@@ -201,6 +204,7 @@ function updateWebPage(req: Request, res: Response) {
 
   Company.findByIdAndUpdate(idCompany, {
     tx_email: txEmail,
+    tx_telegram: txTelegram,
     tx_whatsapp: txWhatsapp,
     tx_facebook: txFacebook,
     tx_twitter: txTwitter,

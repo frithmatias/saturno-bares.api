@@ -1,4 +1,5 @@
 //import { SERVER_PORT } from "./global/environment";
+import environment from './global/environment.prod';
 import Server from './classes/server';
 import bodyParser from 'body-parser';
 import fileUpload from 'express-fileupload';
@@ -25,10 +26,6 @@ import uploadRoutes from './routes/upload.routes';
 import imageRoutes from './routes/image.routes';
 import settingsRoutes from './routes/settings.routes';
 
-
-import environment from './global/environment.prod';
-
-
 // SINGLETON
 // const server = new Server();
 const server = Server.instance; // obtenemos una nueva instancia de forma estática
@@ -50,23 +47,21 @@ server.app.use(express.static(publicPath));
 server.app.use(bodyParser.urlencoded({ extended: true }));
 server.app.use(bodyParser.json());
 
-
 // express-fileupload
 server.app.use(fileUpload());
 
 // CORS
 server.app.use(cors({ origin: true, credentials: true })); // permito que cualquier persona puede llamar mis servicios.
 
-
 // compress all responses
 //server.app.use(compression());
-
 
 server.app.get('/test', (req, res) => {
 	const animal = 'alligator';
 	// Send a text/html file back with the word 'alligator' repeated 1000 times
 	res.send(animal.repeat(100000));
 })
+
 server.app.use('/t', ticketRoutes);
 server.app.use('/p', publicRoutes);
 server.app.use('/superuser', superuserRoutes);
@@ -82,7 +77,6 @@ server.app.use('/scoreitem', scoreItemRoutes);
 server.app.use('/uploads', uploadRoutes);
 server.app.use('/image', imageRoutes);
 server.app.use('/settings', settingsRoutes);
-
 
 server.start(() => {
 	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }

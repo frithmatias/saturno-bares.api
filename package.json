@@ -24,6 +24,8 @@
 		"moment": "^2.29.1",
 		"mongoose": "^5.10.15",
 		"mongoose-unique-validator": "^2.0.3",
+		"node-cron": "^2.0.3",
+		"node-telegram-bot-api": "^0.51.0",
 		"nodemon": "^2.0.6",
 		"rxjs": "^6.6.3",
 		"socket.io": "^2.3.0",
@@ -40,6 +42,8 @@
 		"@types/jsonwebtoken": "^8.5.0",
 		"@types/mongoose": "^5.10.1",
 		"@types/mongoose-unique-validator": "^1.0.4",
+		"@types/node-cron": "^2.0.3",
+		"@types/node-telegram-bot-api": "^0.51.0",
 		"@types/socket.io": "^2.1.11",
 		"@types/web-push": "^3.3.0"
 	}

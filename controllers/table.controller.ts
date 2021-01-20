@@ -120,7 +120,6 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
             if (sectionDB) {
                 server.io.to(sectionDB.id_company).emit('update-waiters');
-                server.io.to(sectionDB.id_company).emit('update-clients');
             }
 
             if (tableDB.tx_status === 'idle') {
@@ -207,6 +206,7 @@ let assignTables = (req: Request, res: Response) => {
             }
 
             server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
+            
             if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
             if (blPriority || blFirst) {

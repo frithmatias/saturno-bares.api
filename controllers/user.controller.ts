@@ -404,6 +404,10 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/settings',
           tx_icon: 'mdi mdi-cog'
         }, {
+          tx_titulo: 'Agenda',
+          tx_url: '/admin/schedule',
+          tx_icon: 'mdi mdi-clock-outline'
+        }, {
           tx_titulo: 'Mi Perfil',
           tx_url: '/admin/profile',
           tx_icon: 'mdi mdi-shield-star'

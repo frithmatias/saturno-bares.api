@@ -2,6 +2,7 @@ let env = process.env.NODE_ENV;
 let environment: any;
 if (env === 'produ') {
 	environment = {
+		TOKEN_TELEGRAM: process.env.TOKEN_TELEGRAM,
 		TOKEN_SEED: process.env.TOKEN_SEED,
 		TOKEN_TIMEOUT: process.env.TOKEN_TIMEOUT,
 		GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -12,11 +13,12 @@ if (env === 'produ') {
 		FTP_USER: process.env.FTP_USER,
 		FTP_PASS: process.env.FTP_PASS,
 		SERVER_PORT: process.env.PORT
-		
+	
 	};
 } else {
 	var desar = require('./environment');
 	environment = {
+		TOKEN_TELEGRAM: desar.environment.TOKEN_TELEGRAM,
 		TOKEN_SEED: desar.environment.TOKEN_SEED,
 		TOKEN_TIMEOUT: desar.environment.TOKEN_TIMEOUT,
 		GOOGLE_CLIENT_ID: desar.environment.GOOGLE_CLIENT_ID,
