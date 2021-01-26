@@ -5,7 +5,7 @@ import socketIO from 'socket.io';
 export const escucharMensajes = (cliente: Socket, io: socketIO.Server) => {
 	cliente.on('enterCompany', (idCompany) => {
 		cliente.join(idCompany);
-		console.log(cliente.id, 'entrando a la sala ', idCompany);
+		console.log('System: ', cliente.id, ' entrando a ', idCompany);
 	})
 	// Orden enviada por el cliente.
 	cliente.on('cliente-en-camino', (idSocketDesk) => {

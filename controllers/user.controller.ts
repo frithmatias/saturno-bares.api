@@ -118,146 +118,142 @@ async function verify(token: string) {
   return {
     name: payload.name,
     email: payload.email,
-    img: payload.picture,
-    google: true,
-    payload: payload
+    img: payload.picture
   };
 }
 
 async function loginGoogle(req: Request, res: Response) {
   var gtoken = req.body.gtoken;
-  await verify(gtoken)
-    .then((googleUser) => {
+  await verify(gtoken).then((googleUser) => {
+    User.findOne({ tx_email: googleUser.email })
+      .populate('id_company')
+      .then(userDB => {
 
-      User.findOne({ tx_email: googleUser.email })
-        .populate('id_company')
-        .then(userDB => {
+        if (userDB) {  // el user existe, intenta loguearse
 
-          if (userDB) {  // el user existe, intenta loguearse
+          if (userDB.bl_google === false) {
 
-            if (userDB.bl_google === false) {
+            return res.status(400).json({
+              ok: false,
+              msg: "Para el email ingresado debe usar autenticación con clave.",
+              user: null
+            });
 
-              return res.status(400).json({
-                ok: false,
-                msg: "Para el email ingresado debe usar autenticación con clave.",
-                user: null
-              });
+          } else {
 
-            } else {
+            // Google SignIn -> new token
+            var token = Token.getJwtToken({ user: userDB });
 
-              // Google SignIn -> new token
-              var token = Token.getJwtToken({ user: userDB });
+            userDB.updateOne({ tm_lastlogin: + new Date().getTime() })
+              .then(async userSaved => {
 
-              userDB.updateOne({ tm_lastlogin: + new Date().getTime() })
-                .then(async userSaved => {
-
-                  userSaved.tx_password = ":)";
-                  await obtenerMenu(userDB.id_role).then(menu => {
+                userSaved.tx_password = ":)";
+                await obtenerMenu(userDB.id_role).then(menu => {
 
 
-                    let home;
-                    switch (userDB.id_role) {
-                      case 'ADMIN_ROLE':
-                        home = '/admin/home';
-                        break;
-                      case 'SUPERUSER_ROLE':
-                        home = '/superuser/home';
-                        break;
-                      default:
-                        home = '/admin/role';
-                    };
+                  let home;
+                  switch (userDB.id_role) {
+                    case 'ADMIN_ROLE':
+                      home = '/admin/home';
+                      break;
+                    case 'SUPERUSER_ROLE':
+                      home = '/superuser/home';
+                      break;
+                    default:
+                      home = '/admin/role';
+                  };
 
-                    res.status(200).json({
-                      ok: true,
-                      msg: 'Login exitoso',
-                      token: token,
-                      user: userDB,
-                      menu,
-                      home
-                    });
-
-                  }).catch(() => {
-
-                    res.status(500).json({
-                      ok: false,
-                      msg: 'No se pudo obtener el menu del usuario',
-                      token: null,
-                      user: null,
-                      menu: null,
-                      home: null
-                    })
-
-                  })
-
-
-                }).catch((err) => {
-
-                  return res.status(400).json({
-                    ok: false,
-                    msg: 'Error al loguear el user de Google',
-                    err
+                  res.status(200).json({
+                    ok: true,
+                    msg: 'Login exitoso',
+                    token: token,
+                    user: userDB,
+                    menu,
+                    home
                   });
 
-                });
+                }).catch(() => {
 
-            }
+                  res.status(500).json({
+                    ok: false,
+                    msg: 'No se pudo obtener el menu del usuario',
+                    token: null,
+                    user: null,
+                    menu: null,
+                    home: null
+                  })
 
-          } else { // el user no existe, hay que crearlo.
+                })
 
-            var user = new User();
-            user.tx_email = googleUser.email;
-            user.tx_name = googleUser.name;
-            user.tx_password = ':)';
-            user.tx_img = googleUser.img;
-            user.bl_google = true;
-            user.tm_lastlogin = new Date();
-            user.tm_createdat = new Date();
-            user.id_role = 'ADMIN_ROLE';
-            user.cd_pricing = 0;
 
-            user.save().then(async userSaved => {
+              }).catch((err) => {
 
-              var token = Token.getJwtToken({ user });
-              await obtenerMenu(user.id_role).then(menu => {
-
-                res.status(200).json({
-                  ok: true,
-                  msg: 'Usuario creado y logueado correctamente',
-                  token: token,
-                  user,
-                  menu,
-                  home: '/admin/home'
-                });
-              }).catch(() => {
-                res.status(500).json({
+                return res.status(400).json({
                   ok: false,
-                  msg: 'Error al obtener el menu del usuario',
-                  token: null,
-                  user: null,
-                  menu: null,
-                  home: null
+                  msg: 'Error al loguear el user de Google',
+                  err
                 });
-              })
-            }).catch((err) => {
 
-              res.status(500).json({
-                ok: false,
-                msg: 'Error al guardar el user de Google',
-                err
               });
 
-            })
           }
-        }).catch((err) => {
 
-          res.status(500).json({
-            ok: false,
-            msg: "Error al buscar user",
-            error: err
-          });
+        } else { // el user no existe, hay que crearlo.
 
-        })
-    })
+          var user = new User();
+          user.tx_email = googleUser.email;
+          user.tx_name = googleUser.name;
+          user.tx_password = ':)';
+          user.tx_img = googleUser.img;
+          user.bl_google = true;
+          user.tm_lastlogin = new Date();
+          user.tm_createdat = new Date();
+          user.id_role = 'ADMIN_ROLE';
+          user.cd_pricing = 0;
+
+          user.save().then(async userSaved => {
+
+            var token = Token.getJwtToken({ user });
+            await obtenerMenu(user.id_role).then(menu => {
+
+              res.status(200).json({
+                ok: true,
+                msg: 'Usuario creado y logueado correctamente',
+                token: token,
+                user,
+                menu,
+                home: '/admin/home'
+              });
+            }).catch(() => {
+              res.status(500).json({
+                ok: false,
+                msg: 'Error al obtener el menu del usuario',
+                token: null,
+                user: null,
+                menu: null,
+                home: null
+              });
+            })
+          }).catch((err) => {
+
+            res.status(500).json({
+              ok: false,
+              msg: 'Error al guardar el user de Google',
+              err
+            });
+
+          })
+        }
+      }).catch((err) => {
+
+        res.status(500).json({
+          ok: false,
+          msg: "Error al buscar user",
+          error: err
+        });
+
+      })
+  })
     .catch(err => {
       res.status(403).json({
         ok: false,
@@ -532,6 +528,7 @@ export = {
   attachCompany,
   checkEmailExists,
   updateToken,
+  verify,
   loginGoogle,
   loginUser,
   obtenerMenu

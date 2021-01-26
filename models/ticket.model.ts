@@ -1,4 +1,5 @@
 import { Schema, model, Document } from 'mongoose';
+import { Company } from './company.model';
 
 const ticketsSchema = new Schema({
     id_company: { type: String, ref: 'Company', required: [true, 'El id_company es necesario'] },
@@ -10,8 +11,6 @@ const ticketsSchema = new Schema({
     tx_name: { type: String, required: false, default: null },
     tx_platform: { type: String, required: false, default: null },
     id_user: { type: String, required: false, default: null },
-    nm_phone: { type: Number, required: false, default: null },
-    tx_email: { type: String, required: false, default: null },
     tx_call: { type: String, required: false, default: null },
     tx_status: { type: String, required: [true, 'El tx_status es necesario'], default: 'queued' },
     cd_tables: { type: [Number], required: true, default: [] }, // only for requested and assigned tickets
@@ -28,7 +27,7 @@ const ticketsSchema = new Schema({
 }, { collection: "tickets" })
 
 export interface Ticket extends Document {
-    id_company: string;
+    id_company: any | string;
     id_section: string;
     id_session?: string | null; 
     nm_persons: number;
@@ -37,10 +36,8 @@ export interface Ticket extends Document {
     tx_name: string | null;
     tx_platform: string | null;
     id_user: string | null;
-    nm_phone: number | null;
-    tx_email: string | null;
     tx_call: string | null;
-    tx_status: string; // Virtual: [queued, requested, assigned -> provided], Scheduled: [waiting, scheduled, assigned -> provided ]
+    tx_status: string; // Virtual: [queued, requested, assigned, provided, finished, terminated], Scheduled: [waiting, scheduled, assigned, provided, finished, terminated]
     cd_tables: number[]; //for requested and assigned tickets
     id_position: number | null;
     id_socket_client: string | null;

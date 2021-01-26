@@ -3,9 +3,10 @@ import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { Ticket } from '../models/ticket.model';
 import spm from '../classes/spm';
-import Server from '../classes/server';
 
+import Server from '../classes/server';
 const server = Server.instance; // singleton
+
 // ========================================================
 // Table Methods
 // ========================================================
@@ -230,7 +231,6 @@ let assignTables = (req: Request, res: Response) => {
                 }
 
                 spm.provide(tablesToProvide, ticketSaved).then((resp) => {
-                    console.log(resp)
                     return res.status(200).json({
                         ok: true,
                         msg: resp,

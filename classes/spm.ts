@@ -2,6 +2,7 @@ import { Table } from "../models/table.model";
 import { TableSession } from "../models/table.session.model";
 import { Ticket } from "../models/ticket.model";
 import { Settings } from '../models/settings.model';
+import Server from './server';
 
 // SPM:
 // PUSH(), PULL() Y PROVIDE()
@@ -94,7 +95,8 @@ export default class Spm {
                 tm_provided: null,
                 tm_att: null,
                 tm_end: null
-            }).then(async (ticketsDB: Ticket[]) => {
+            })
+            .then(async (ticketsDB: Ticket[]) => {
 
                 // No hay tickets en espera la mesa queda IDLE.
                 if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
@@ -111,10 +113,10 @@ export default class Spm {
                 // 2B. primer 'assigned' que le corresponda la mesa 
 
                 // declaro el ticket, si lo encuentro se lo voy a pasar a provide()
-                let ticketSelected: Ticket;
+                let ticketToProvide: Ticket;
 
                 // 1. (AUTO ON AND OFF)
-                ticketSelected = ticketsDB.filter((ticket: Ticket) =>
+                ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
                     ticket.tx_status === 'assigned' &&
                     ticket.cd_tables?.includes(table.nm_table) &&
                     ticket.bl_priority === true
@@ -126,8 +128,8 @@ export default class Spm {
                 if (settings?.bl_spm_auto) {
                     // AUTO ON
                     // 2A.
-                    if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
+                    if (!ticketToProvide) {
+                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
                             ticket.tx_status === 'queued' &&
                             ticket.nm_persons <= table.nm_persons &&
                             ticket.bl_priority === true
@@ -135,8 +137,8 @@ export default class Spm {
                     }
 
                     // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' de características compatibles con la mesa 
-                    if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
+                    if (!ticketToProvide) {
+                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
                             (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table)) ||
                             (ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)
                         )[0];
@@ -145,24 +147,26 @@ export default class Spm {
                 } else {
                     // AUTO OFF
                     // 2B. primer 'assigned' que le corresponda la mesa 
-                    if (!ticketSelected) {
-                        ticketSelected = ticketsDB.filter((ticket: Ticket) =>
+                    if (!ticketToProvide) {
+                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
                             (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table))
                         )[0];
                     }
 
                 }
 
-                if (ticketSelected) {
-
-                    if (ticketSelected.tx_status === 'assigned') {
+                
+                // Encontró un ticket para proveerle la mesa.
+                if (ticketToProvide) {
+                    if (ticketToProvide.tx_status === 'assigned') {
                         
-                        // busco TODAS las mesas en el ticket
+                        // si es 'assigned' el camarero le asigno mas de una mesa, 
+                        // busco TODAS las mesas en el ticket y se las paso a provide()
                         Table.find({
                             id_section: table.id_section,
-                            nm_table: { $in: ticketSelected.cd_tables }
+                            nm_table: { $in: ticketToProvide.cd_tables }
                         }).then(tablesDB => {
-                            Spm.provide(tablesDB, ticketSelected).then((resp: string) => {
+                            Spm.provide(tablesDB, ticketToProvide).then((resp: string) => {
                                 return resolve(resp)
                             }).catch((resp) => {
                                 return reject(resp)
@@ -170,8 +174,9 @@ export default class Spm {
                         })
                     }
 
-                    else if (ticketSelected.tx_status === 'queued') {
-                        Spm.provide([table], ticketSelected).then((resp: string) => {
+                    // si es 'queued' el sistema le asigno una mesa única
+                    else if (ticketToProvide.tx_status === 'queued') {
+                        Spm.provide([table], ticketToProvide).then((resp: string) => {
                             return resolve(resp)
                         }).catch((resp) => {
                             return reject(resp)
@@ -190,13 +195,12 @@ export default class Spm {
 
 
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
-
         return new Promise(async (resolve, reject) => {
 
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
-                    if (table.tx_status === 'idle') {
+                    if (table.tx_status === 'idle' || table.tx_status === 'paused') {
                         table.tx_status = 'reserved';
                         await table.save();
                     }
@@ -232,6 +236,10 @@ export default class Spm {
                             ticket.tm_provided = new Date();
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
+                                    const server = Server.instance; // singleton
+                                    console.log('PROVIDE:', ticket.id_company, ticket.id_socket_client)
+                                    server.io.to(ticket.id_company).emit('update-waiters');
+                                    if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }
                             }).catch(() => reject('Error guardando nuevo estado de ticket'))

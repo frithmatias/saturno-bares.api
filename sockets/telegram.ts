@@ -1,23 +1,50 @@
-import { Socket } from 'socket.io';
-import socketIO from 'socket.io';
+import { Ticket } from '../models/ticket.model';
+import ticket from '../controllers/ticket.controller';
+import TelegramBot from 'node-telegram-bot-api';
+import Server from '../classes/server';
 
-// Borrar marcador
-export const escucharMensajes = (cliente: Socket, io: socketIO.Server) => {
-	cliente.on('enterCompany', (idCompany) => {
-		cliente.join(idCompany);
-		console.log(cliente.id, 'entrando a la sala ', idCompany);
-	})
-	// Orden enviada por el cliente.
-	cliente.on('cliente-en-camino', (idSocketDesk) => {
-		io.to(idSocketDesk).emit('cliente-en-camino');
-	});
+export const escucharTelegram = (bot: TelegramBot) => {
+    
+    bot.on('message', (msg: any) => {
+        const chatId = msg.chat.id;
+        const firstName = msg.chat.first_name;
+        bot.sendMessage(chatId, `Hola ${firstName} recibimos tu mensaje.`);
+    });
 
-	cliente.on('mensaje-publico', (payload: { de: string, cuerpo: string }) => {
-		io.emit('mensaje-publico', payload);
-	});
-	
-	cliente.on('mensaje-privado', (payload: { to: string, msg: string }) => {
-		io.to(payload.to).emit('mensaje-privado', payload);
-	});
-};
+    // CONFIRM TICKET BY TX_NAME  
+    bot.onText(/\/conf (.+)/, async (msg, match) => {
+        const idUser = msg.chat.id.toString();
+        const firstName = msg.chat.first_name;
+        const idTicket = match !== null ? match[1] : '';
 
+        await Ticket.find({ tx_name: idTicket }).then(tickets => {
+            for (let ticket of tickets) {
+                ticket.tx_status = 'scheduled';
+                ticket.tx_platform = 'telegram';
+                ticket.id_user = 'test';
+                ticket.save().then(() => {
+                    if (ticket.id_socket_client) {
+                        const server = Server.instance; // singleton
+                        server.io.to(ticket.id_socket_client).emit('update-private', { txPlatform: 'telegram', idUser: 'test' });
+                    }
+                    bot.sendMessage(idUser, 'Validado ' + ticket._id);
+                })
+            }
+        })
+    })
+
+    // VALIDATE TICKET
+    bot.onText(/\/start (.+)/, async (msg, match) => {
+        const idUser = msg.chat.id.toString();
+        const txPlatform = 'telegram';
+        const txName = msg.chat.first_name;
+        const idTicket = match !== null ? match[1] : '';
+
+        ticket.validateTicket(idTicket, txPlatform, idUser, txName).then((resp: string) => {
+            bot.sendMessage(idUser, resp);
+        }).catch(() => {
+            bot.sendMessage(idUser, 'Ocurrió un error al validar tu ticket, por favor volvé a intentar mas tarde.')
+        })
+
+    });
+}

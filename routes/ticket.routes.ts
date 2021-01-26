@@ -14,14 +14,15 @@ ticketRoutes.post('/readavailability', ticketController.readAvailability);
 ticketRoutes.post('/createticket', ticketController.createTicket);
 ticketRoutes.get('/readusertickets/:txPlatform/:idUser', ticketController.readUserTickets);
 ticketRoutes.get('/readtickets/:idCompany', ticketController.readTickets);
+ticketRoutes.get('/readticket/:idTicket', ticketController.readTicket);
+
 ticketRoutes.post('/callwaiter', ticketController.callWaiter);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
-
+ticketRoutes.post('/validateticketgoogle', ticketController.validateTicketGoogle);
 
 // waiter actions
 ticketRoutes.post('/endticket', ticketController.endTicket);
 ticketRoutes.post('/releaseticket', mdAuth.verificaToken, ticketController.releaseTicket);
 ticketRoutes.post('/attendedticket', mdAuth.verificaToken, ticketController.attendedTicket);
-
 
 export default ticketRoutes;

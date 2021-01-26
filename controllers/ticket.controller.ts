@@ -1,8 +1,3 @@
-import { Request, Response } from 'express';
-import Server from '../classes/server';
-import spm from '../classes/spm';
-import cron from 'node-cron';
-
 // MODELS
 import { Ticket } from '../models/ticket.model';
 import { Position } from '../models/position.model';
@@ -10,18 +5,24 @@ import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { TableSession } from '../models/table.session.model';
 import { Settings } from '../models/settings.model';
+import { Request, Response } from 'express';
+import user from './user.controller';
+import Server from '../classes/server';
+import spm from '../classes/spm';
+import cron from 'node-cron';
+import colors from '../global/colors';
 
 cron.schedule('*/10 * * * * *', () => {
 	checkScheduled();
 })
-
-const server = Server.instance; // singleton
 
 // ========================================================
 // waiter methods
 // ========================================================
 
 function attendedTicket(req: Request, res: Response) {
+	const server = Server.instance; // singleton
+
 	const idTicket = req.body.idTicket;
 	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null }, { new: true }).then(ticketAttended => {
 		if (ticketAttended) {
@@ -45,6 +46,7 @@ function attendedTicket(req: Request, res: Response) {
 function releaseTicket(req: Request, res: Response) {
 
 	const ticket: Ticket = req.body.ticket;
+	const server = Server.instance; // singleton
 
 	let newStatus;
 	if (ticket.cd_tables) {
@@ -113,9 +115,11 @@ function releaseTicket(req: Request, res: Response) {
 	})
 }
 
-function endTicket(req: Request, res: Response) {
+async function endTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
-	Ticket.findByIdAndUpdate(idTicket, { tx_status: 'finished', tm_end: new Date() }, { new: true }).then((ticketCanceled) => {
+	const reqBy = req.body.reqBy;
+	const newStatus = reqBy === 'waiter' ? 'finished' : 'cancelled';
+	await Ticket.findByIdAndUpdate(idTicket, { tx_status: newStatus, tm_end: new Date() }, { new: true }).then(async (ticketCanceled) => {
 
 		if (!ticketCanceled) {
 			return res.status(400).json({
@@ -129,7 +133,7 @@ function endTicket(req: Request, res: Response) {
 
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, pauso la mesa y cierro su sesión.
-			TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(async sessionCanceled => {
+			await TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(async sessionCanceled => {
 				// let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
 
 				if (!sessionCanceled) {
@@ -141,25 +145,39 @@ function endTicket(req: Request, res: Response) {
 					await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
 				}
 
+				const server = Server.instance; // singleton
 				server.io.to(ticketCanceled.id_company).emit('update-waiters');
-				server.io.to(ticketCanceled.id_company).emit('update-clients');
+				server.io.to(ticketCanceled.id_company).emit('update-clients'); //ticket component
+				if (ticketCanceled.id_socket_client) {
+					server.io.to(ticketCanceled.id_socket_client).emit('update-ticket', ticketCanceled); // ticket-create component
+				}
+
+				console.log('enviando actualizar a ', ticketCanceled.id_company)
 
 				return res.status(200).json({
 					ok: true,
-					msg: "Mesas liberadas correctamente",
+					msg: "Ticket finalalizado correctamente",
 					ticket: null
 				})
 
 			}).catch(() => {
+
 				return res.status(400).json({
 					ok: false,
 					msg: "No se pudo cancelar la sesion de mesa",
 					ticket: null
 				})
+
 			})
+
 		} else {
+
+			const server = Server.instance; // singleton
 			server.io.to(ticketCanceled.id_company).emit('update-waiters');
-			server.io.to(ticketCanceled.id_company).emit('update-clients');
+			server.io.to(ticketCanceled.id_company).emit('update-clients'); //ticket component
+			if (ticketCanceled.id_socket_client) {
+				server.io.to(ticketCanceled.id_socket_client).emit('update-ticket', ticketCanceled); // ticket-create component
+			}
 			return res.status(200).json({
 				ok: true,
 				msg: "Ticket finalizado correctamente",
@@ -195,8 +213,22 @@ async function readAvailability(req: Request, res: Response) {
 
 	let intervals = [...Array(24).keys()]; // 0-23 
 	let compatibleTables: number[] = [];
-	let scheduledTickets: Ticket[] = [];
-	let availability: availability[];
+	let sectionTables: number[] = [];
+
+	let scheduledTickets: Ticket[] = []; // tickets agendados para el día seleccionado y que tengan mesas compatibles asignadas
+	let availability: availability[] = [];
+
+
+	// Get scheduled tickets
+	await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: tmReserve, cd_tables: { $in: compatibleTables } })
+		.then(resp => scheduledTickets = resp)
+		.catch(() => {
+			return res.status(500).json({
+				ok: false,
+				msg: 'Error al obtener los tickets en la agenda',
+				availability
+			})
+		})
 
 	// Get compatible tables 
 	await Table.find({ id_section: idSection, nm_persons: { $gte: nmPersons } })
@@ -205,129 +237,135 @@ async function readAvailability(req: Request, res: Response) {
 			return res.status(500).json({
 				ok: false,
 				msg: 'Error al obtener las mesas compatibles',
-				availability: []
+				availability
 			})
 		})
+
+	// 1. Si no hay mesas compatibles, devuelvo TODAS las CAPACIDADES de cada mesa disponible por intervalo para analizar la posibilidad de armar una mesa especial
+	// 2. Si hay mesas que cumplen la capacidad solicitada se devuelve la disponibilidad SOLO de esas mesas por intervalo.
 
 	if (compatibleTables.length === 0) {
-		return res.status(200).json({
-			ok: true,
-			msg: 'No hay mesas compatibles',
-			availability: []
-		})
-	}
-
-	// Get scheduled and waiting to confirm tickets 
-	let takenIntervals = ['scheduled', 'waiting'];
-	await Ticket.find({ id_section: idSection, tx_status: { $in: takenIntervals }, tm_reserve: tmReserve, cd_tables: { $in: compatibleTables } })
-		.then(resp => scheduledTickets = resp)
-		.catch(() => {
-			return res.status(500).json({
-				ok: false,
-				msg: 'Error al obtener los tickets agendados',
-				availability: [],
+		await Table.find({ id_section: idSection })
+			.then(resp => sectionTables = resp.map(table => table.nm_persons))
+			.catch(() => {
+				return res.status(500).json({
+					ok: false,
+					msg: 'Error al obtener todas las mesas del sector',
+					availability
+				})
 			})
-		})
-
-	if (scheduledTickets.length === 0) {
-		availability = [];
-		intervals.forEach(num => {
-			availability.push({ interval: num, tables: compatibleTables })
-		})
-		return res.status(200).json({
-			ok: true,
-			msg: 'No hay tickets agendados',
-			availability
-		})
 	}
 
-	// has compatible tables and scheduled tickets, lets verify availability... 
-	let availableIntervals = [...Array(24).keys()]; // 0-23 all available by default
-	availability = [];
 
 	for (let hr of intervals) {
-		let availableTables: number[] = compatibleTables;
+		let availableTables: number[] = compatibleTables.length > 0 ? compatibleTables : sectionTables;
 		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getHours() === hr);
 		for (let ticket of scheduledTicketsInterval) { // for each scheduled ticket
-			for (let table of ticket.cd_tables) { // for each scheduled table
-				if (availableTables.includes(table)) { // remove table scheduled
+			for (let table of ticket.cd_tables) { // for each table assigned in that ticket
+				if (availableTables.includes(table)) { // remove table from my available tables list
 					availableTables = availableTables.filter(nm => nm != table);
 				}
 			}
 		}
-
-		if (availableTables.length <= 0) { // if all available tables were scheduled then remove interval
-			availableIntervals = availableIntervals.filter(interval => interval != hr)
-		}
-
 		availability.push({ interval: hr, tables: availableTables })
 	}
 
+
+
 	// If receives tmReserve and that interval continues with available tables after a second check, take first available table and reserve it.
 	return res.status(200).json({
-		ok: true,
+		ok: compatibleTables.length > 0 ? true : false,
 		msg: 'Disponibilidad obtenida correctamente',
 		availability
 	})
 }
 
 async function checkScheduled() {
+	const server = Server.instance; // singleton
 
 	let scheduledTickets: Ticket[] = [];
-	const difToReserve = 2 * 60 * 60 * 1000; // 2hrs
 
-	await Ticket.find({ tm_reserve: { $ne: null }, tm_provided: null, tm_end: null }).then(data => {
-		scheduledTickets = data;
-	}).catch(() => {
-		console.log('error')
-	})
+	await Ticket.find({ tm_reserve: { $ne: null }, tm_provided: null, tm_end: null })
+		.populate('id_company')
+		.then(data => {
+			scheduledTickets = data;
+		}).catch(() => {
+		})
 
 	let waiting = scheduledTickets.filter(ticket => ticket.tx_status === 'waiting');
 	let scheduled = scheduledTickets.filter(ticket => ticket.tx_status === 'scheduled');
 	let assigned = scheduledTickets.filter(ticket => ticket.tx_status === 'assigned');
 
-	console.log('waiting:', waiting.length, ' scheduled: ', scheduled.length, ' assigned: ', assigned.length);
+	console.log(`${colors.FgBlue}System:${colors.Reset}`, 'waiting:', waiting.length, ' scheduled: ', scheduled.length, ' assigned: ', assigned.length);
 
 	for (let ticket of scheduledTickets) {
 		if (!ticket.tm_reserve) {
 			return;
 		}
 		const now = +new Date().getTime();
-		const timeToReserve = ticket.tm_reserve?.getTime() - now;
+		const timeToProvide = (ticket.tm_reserve?.getTime() - now) <= 0;
+		const timeToReserve = (ticket.tm_reserve?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
+		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
 
-		// Es hora de provisión?	
-		if (timeToReserve <= 0 && ticket.tm_provided === null) {
-			console.log('Privison de agendado')
+		// -------------------------------------------------------------
+		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'waiting' && timeToTerminate) {
+			ticket.tx_status = 'terminated';
+			ticket.tm_end = new Date();
+			await ticket.save().then((ticketSaved) => {
+				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
+				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
+
+			})
+		}
+
+		// -------------------------------------------------------------
+		// IN TIME: PROVIDE TABLE	
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'assigned' && timeToProvide) {
 			Table.findOne({ id_section: ticket.id_section, nm_table: ticket.cd_tables[0] }).then(tableToProvide => {
+
 				if (!tableToProvide) {
 					return;
 				}
+
 				spm.pull(tableToProvide).then(data => {
-					console.log('MESA PROVEIDA', data)
+					console.log('System: ', 'Mesa aprovisionada ok', data);
 				})
 
 			})
 		}
 
-		// Faltan 2hs o menos para la hora de provisión?
-		console.log(timeToReserve, difToReserve)
-		if (ticket.tx_status === 'scheduled' && (timeToReserve < difToReserve)) {
-			Table.findOne({ id_section: ticket.id_section, nm_table: ticket.cd_tables[0] }).then(tableToReserve => {
-				if (!tableToReserve) {
-					return;
-				}
-				
-				console.log('Intentando liberar la mesa ', tableToReserve.nm_table, ' en estado ', tableToReserve.tx_status)
-				if (tableToReserve?.tx_status !== 'busy') {
-					tableToReserve.tx_status = 'reserved';
-					tableToReserve.save().then(() => {
-						ticket.tx_status = 'assigned';
-						ticket.save().then(() => {
-							console.log('Ticket asignado y mesa reservada!')
+		// -------------------------------------------------------------
+		// BEFORE 2HS AT TM_RESERVE: TABLE RESERVE AND TICKET ASSIGN
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'scheduled' && timeToReserve) {
+			await Table.findOne({ id_section: ticket.id_section, nm_table: ticket.cd_tables[0] })
+				.then(async tableToReserve => {
+
+					if (!tableToReserve) {
+						return;
+					}
+
+					console.log('System: ', 'Intentando reservar la mesa ', tableToReserve.nm_table, ' en estado ', tableToReserve.tx_status)
+
+					if (tableToReserve?.tx_status !== 'busy') {
+						tableToReserve.tx_status = 'reserved';
+						await tableToReserve.save().then(async () => {
+							ticket.tx_status = 'assigned';
+
+							await ticket.save().then((ticketSaved: Ticket) => {
+								console.log('System: ', 'Mesa reservada y ticket asignado ok')
+								server.io.to(ticket.id_company._id).emit('update-waiters');
+								if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
+							})
 						})
-					})
-				}
-			})
+					}
+				})
 
 		}
 
@@ -339,7 +377,8 @@ async function checkScheduled() {
 
 function createTicket(req: Request, res: Response) {
 
-	const { blContingent, idSocket, txName, nmPersons, idSection, nmPhone, txEmail, tmReserve, cdTables } = req.body;
+	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables } = req.body;
+	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
@@ -407,8 +446,6 @@ function createTicket(req: Request, res: Response) {
 			bl_priority: false,
 			tx_name: txName,
 			tx_platform: null,
-			nm_phone: nmPhone,
-			tx_email: txEmail,
 			tx_call: null,
 			tm_call: null,
 			tx_status: txStatus,
@@ -436,7 +473,7 @@ function createTicket(req: Request, res: Response) {
 				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Spm desactivado, el ticket quedo en cola o agendado.';
 
 				// envío pedido de actualización despues del push
-				const server = Server.instance;
+
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
 				return res.status(201).json({
@@ -480,8 +517,146 @@ function createTicket(req: Request, res: Response) {
 
 };
 
+async function validateTicketGoogle(req: Request, res: Response) {
+
+	let idTicket = req.body.idTicket;
+	var gtoken = req.body.gtoken;
+
+	await user.verify(gtoken).then((googleUser: any) => {
+
+		let txName = googleUser.name;
+		let txEmail = googleUser.email;
+		let txImage = googleUser.img;
+
+		// El usuario de Google es válido, ahora busco el ticket y lo valido 'waiting' -> 'schedule'
+		validateTicket(idTicket, 'google', txEmail, txName).then((data: string) => {
+
+			return res.status(200).json({
+				ok: true,
+				msg: 'El usuario es válido el ticket fué confirmado correctamente',
+				response: data
+			})
+
+		}).catch((err) => {
+			return res.status(400).json({
+				ok: false,
+				msg: err,
+				response: null
+			})
+		})
+	})
+
+}
+
+async function validateTicket(idTicket: string, txPlatform: string, idUser: string, txName?: string): Promise<string> {
+
+	return new Promise(async (resolve, reject) => {
+		const server = Server.instance; // singleton
+		let response: string = '';
+		return await Ticket.findById(idTicket)
+			.populate('id_company')
+			.then(async (ticketWaiting) => {
+
+				// No tiene un ticket activo para este comercio, procede a validarlo.
+				if (!ticketWaiting) {
+					return reject('No existe el ticket o el ticket fué cancelado.');
+				}
+
+				// 1. Busco el ticket y verifico que no esté confirmado, si ya estaba confirmado le envío el ticket, probablemente la webapp no lo tiene en el storage.
+				// 2. Verifico que no exista otro ticket activo para ese usuario para ese mismo comercio 
+				// 3. Si existe el 'waiting' queda 'terminated', lo notifico, y le envío la lista actualizada de sus tickets 
+				// 4. Si NO existe procedo a validar el ticket 'scheduled'
+
+
+				// Verifico que el ticket no esté ya confirmado
+				if (ticketWaiting.tx_status === 'scheduled') {
+					if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketWaiting); }
+					return reject('El ticket ya se está confirmado.');
+				}
+
+				// Busco tickets activos para este usuario y para este negocio.
+				let ticketsUser = await Ticket.find({
+					_id: { $ne: ticketWaiting?._id }, // que no sea el que hay que validar
+					tx_platform: txPlatform,
+					id_user: idUser,
+					id_company: ticketWaiting?.id_company._id,
+					tm_end: null
+				}).then((ticketsUser: Ticket[]) => {
+					return ticketsUser;
+				})
+
+				// Tiene otro ticket activo para este comercio, se finaliza y se lo notifica.
+				if (ticketsUser && ticketsUser.length > 0) {
+					ticketWaiting.tx_platform = txPlatform;
+					ticketWaiting.id_user = idUser;
+					ticketWaiting.tx_status = 'terminated';
+					ticketWaiting.tm_end = new Date();
+					return await ticketWaiting.save().then((ticketSaved: Ticket) => {
+						if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
+						let response = `Ya tenés un ticket activo para este negocio.`;
+
+						if (['whatsapp', 'telegram'].includes(txPlatform)) {
+							response += `
+							Podés ver todos tus tickets haciendo click en el siguiente enlace: 
+							https://saturno.fun/public/tickets/${txPlatform}/${idUser}`;
+						}
+
+						resolve(response);
+					})
+				}
+
+				// No tiene tickets activos para el comercio, se valida el ticket.
+				ticketWaiting.tx_platform = txPlatform;
+				ticketWaiting.id_user = idUser;
+				
+				// Si la mesa solicitada es -1 se trata de un scheduled_requested
+				ticketWaiting.tx_status = ticketWaiting.cd_tables[0] === -1 ? 'pending' : 'scheduled';
+
+
+				await ticketWaiting.save().then((ticketSaved: Ticket) => {
+					if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); }
+					const idTable = ticketWaiting.cd_tables[0];
+					const txCompanyName = ticketWaiting.id_company.tx_company_name;
+					const txCompanyAddressStreet = ticketWaiting.id_company.tx_address_street;
+					const txCompanyAddressNumber = ticketWaiting.id_company.tx_address_number;
+					const txCompanyLocation = ticketWaiting.id_company.tx_company_location;
+					const dtDate = new Date(String(ticketWaiting.tm_reserve));
+					const dtYear = dtDate.getFullYear();
+					const months = ['Enero', 'Febrero', 'Marzo', 'Arbil', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+					const dtMonth = months[dtDate.getMonth()];
+					const dtDay = dtDate.getDate();
+
+					const idCompany = ticketWaiting.id_company._id;
+					ticketWaiting.id_company = null; // el formulario de ticket del comercio requiere del ticket sin popular id_company
+					ticketWaiting.id_company = idCompany;
+
+					let response = `
+					Hola ${txName}, tu reserva para la mesa ${idTable} quedó confirmada.  
+					
+					Te esperamos el ${dtDay} de ${dtMonth} de ${dtYear} a las ${dtDate.getHours()}:00hs en ${txCompanyName}, ${txCompanyAddressStreet} ${txCompanyAddressNumber}, ${txCompanyLocation}
+					
+					Recordá que tenés 30 minutos extra si no llegas antes de las ${dtDate.getHours()}:30hs tu turno quedará finalizado.
+					`
+
+					if (['whatsapp', 'telegram'].includes(txPlatform)) {
+						response += `
+					Para ver tus tickets visitá este link:
+					https://saturno.fun/public/tickets/${txPlatform}/${idUser}
+					`}
+
+					resolve(response);
+				})
+
+			}).catch(() => {
+				reject('Error al confirmar el ticket o el ticket fué cancelado.');
+			})
+	})
+
+}
+
 function callWaiter(req: Request, res: Response) {
 	const { idTicket, txCall } = req.body;
+	const server = Server.instance; // singleton
 
 	Ticket.findByIdAndUpdate(idTicket, { tx_call: txCall, tm_call: new Date() }, { new: true }).then(ticketAttended => {
 
@@ -511,23 +686,23 @@ function readUserTickets(req: Request, res: Response) {
 	const txPlatform = req.params.txPlatform;
 	const idUser = req.params.idUser;
 
-	Ticket.find({tx_platform: txPlatform, id_user: idUser})
-	.populate('id_company')
-	.then((userTickets: Ticket[]) => {
-		if(!userTickets){
-			return res.status(400).json({
-				ok: false, 
-				msg: 'No hay tickets para el usuario',
-				tickets: null
-			})
-		}
+	Ticket.find({ tx_platform: txPlatform, id_user: idUser, tx_status: { $ne: 'terminated' } })
+		.populate('id_company')
+		.then((userTickets: Ticket[]) => {
+			if (!userTickets) {
+				return res.status(400).json({
+					ok: false,
+					msg: 'No hay tickets para el usuario',
+					tickets: null
+				})
+			}
 
-		return res.status(200).json({
-			ok: true,
-			msg: 'Se obtuvieron los tickets del usuario correctamente',
-			tickets: userTickets
+			return res.status(200).json({
+				ok: true,
+				msg: 'Se obtuvieron los tickets del usuario correctamente',
+				tickets: userTickets
+			})
 		})
-	})
 };
 
 function readTickets(req: Request, res: Response) {
@@ -542,7 +717,7 @@ function readTickets(req: Request, res: Response) {
 		tm_start: { $gt: yesterday },  // only from Yesterday (now -24hs)
 	})
 		.populate({
-			path: 'id_session id_section',
+			path: 'id_session id_section id_company',
 			populate: { path: 'id_tables' }
 		})
 		.then((tickets) => {
@@ -570,7 +745,42 @@ function readTickets(req: Request, res: Response) {
 		})
 };
 
+function readTicket(req: Request, res: Response) {
+
+	const idTicket = req.params.idTicket;
+
+	Ticket.findById(idTicket)
+		.populate({
+			path: 'id_session id_section id_company',
+			populate: { path: 'id_tables' }
+		})
+		.then((ticket) => {
+
+			if (!ticket) {
+				return res.status(400).json({
+					ok: false,
+					msg: "No existe el ticket",
+					ticket: null
+				});
+			}
+
+			return res.status(200).json({
+				ok: true,
+				msg: "Se obtuvo el ticket correctamente",
+				ticket
+			});
+
+		}).catch((err) => {
+			return res.status(500).json({
+				ok: false,
+				msg: err,
+				ticket: null
+			});
+		})
+};
+
 function updateSocket(req: Request, res: Response) {
+	const server = Server.instance; // singleton
 
 	const idTicket = req.body.idTicket;
 	const newSocket = req.body.newSocket;
@@ -629,15 +839,17 @@ function updateSocket(req: Request, res: Response) {
 	})
 }
 
-
 export = {
 	readAvailability,
 	createTicket,
+	validateTicketGoogle,
+	validateTicket,
 	callWaiter,
 	releaseTicket,
 	attendedTicket,
 	endTicket,
 	readUserTickets,
 	readTickets,
+	readTicket,
 	updateSocket
 }

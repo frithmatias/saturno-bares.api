@@ -48,7 +48,6 @@ let sendMessage = (req: Request, res: Response): void => {
 
     if (txMessage && txMessage.length <= 100) {
         server.io.to(idCompany).emit('message-system', txMessage)
-        console.log(txMessage.length)
         res.status(200).json({
             ok: true,
             msg: 'Mensaje enviado correctemante', 

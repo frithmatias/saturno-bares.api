@@ -8,6 +8,7 @@ import path from 'path';
 import express from 'express';
 import mongoose from 'mongoose';
 import compression from 'compression';
+import colors from './global/colors';
 
 // ROUTES
 import publicRoutes from './routes/public.routes';
@@ -24,7 +25,7 @@ import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
 import uploadRoutes from './routes/upload.routes';
 import imageRoutes from './routes/image.routes';
-import settingsRoutes from './routes/settings.routes';
+import settingsRoutes from './routes/settings.routes'; 
 
 // SINGLETON
 // const server = new Server();
@@ -79,7 +80,7 @@ server.app.use('/image', imageRoutes);
 server.app.use('/settings', settingsRoutes);
 
 server.start(() => {
-	console.log(`Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }
+	console.log('System: ', `Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }
 });
 
 // MONGO DB
@@ -90,7 +91,7 @@ mongoose.connect(environment.MONGO_DB, {
 	useFindAndModify: false
 })
 	.then(() => {
-		console.log('MongoDB corriendo en el puerto 27017: \x1b[32m%s\x1b[0m', 'ONLINE');
+		console.log(`${colors.FgBlue}%s${colors.Reset}`,`System:`, 'MongoDB corriendo en el puerto 27017: ', `${colors.FgGreen}ONLINE${colors.Reset}`);
 	})
 	.catch((err) => {
 		throw err;
