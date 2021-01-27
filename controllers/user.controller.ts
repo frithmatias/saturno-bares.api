@@ -347,7 +347,7 @@ function obtenerMenu(txRole: string) {
     let menu_return: any[] = [];
 
     let menu_indicadores = {
-      ricing: 0,
+      cd_pricing: 0,
       tx_titulo: 'Indicadores',
       tx_url: '/metrics/dashboard',
       tx_icon: 'mdi mdi-chart-box',
