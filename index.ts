@@ -57,12 +57,6 @@ server.app.use(cors({ origin: true, credentials: true })); // permito que cualqu
 // compress all responses
 //server.app.use(compression());
 
-server.app.get('/test', (req, res) => {
-	const animal = 'alligator';
-	// Send a text/html file back with the word 'alligator' repeated 1000 times
-	res.send(animal.repeat(100000));
-})
-
 server.app.use('/t', ticketRoutes);
 server.app.use('/p', publicRoutes);
 server.app.use('/superuser', superuserRoutes);

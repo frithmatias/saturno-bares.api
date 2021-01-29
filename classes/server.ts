@@ -7,7 +7,7 @@ import http from 'http';
 import https from 'https';
 import fs from 'fs';
 
-import TelegramBot from 'node-telegram-bot-api';
+// import TelegramBot from 'node-telegram-bot-api';
 
 // listeners
 import * as socket from '../sockets/sockets';
@@ -24,7 +24,7 @@ export default class Server {
 	public app: express.Application;
 	public port: number;
 	public io: socketIO.Server;
-	//private httpServer: http.Server;
+	// private httpServer: http.Server;
 	private httpsServer: https.Server;
 	// private telegramBot: TelegramBot;
 	
@@ -41,7 +41,7 @@ export default class Server {
 		this.escucharSockets(); // socket.io
 
 		// TELEGRAM
-		//this.telegramBot = new TelegramBot(environment.TOKEN_TELEGRAM, { polling: true });
+		// this.telegramBot = new TelegramBot(environment.TOKEN_TELEGRAM, { polling: true });
 		this.escucharTelegram(); // telegram
 	}
 

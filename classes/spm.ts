@@ -200,7 +200,7 @@ export default class Spm {
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
-                    if (table.tx_status === 'idle' || table.tx_status === 'paused') {
+                    if (table.tx_status === 'idle') {
                         table.tx_status = 'reserved';
                         await table.save();
                     }

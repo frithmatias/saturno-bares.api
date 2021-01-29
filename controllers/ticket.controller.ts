@@ -200,7 +200,7 @@ async function endTicket(req: Request, res: Response) {
 
 
 interface availability {
-	interval: number;
+	interval: Date;
 	tables: number[] | tablesData[];
 	capacity: number | null; // -> number when has NOT compatible tables, null has compatible options  
 }
@@ -211,15 +211,24 @@ interface tablesData {
 	blReserved: boolean
 }
 
+
+
 async function readAvailability(req: Request, res: Response) {
+	// si existe una mesa con capacidad para cumplir con el requerimiento de nmPersons, entonces devuelvo 
+	// POR CADA INTERVALO un tipo de 'availability' con tables:[3,5,7] que son las mesas compatibles y disponibles 
+	// (filtro las reservadas). 
+
+	// Si NO existe una mesa que pueda cumplir con ese requerimiento devuelvo POR CADA INTERVALO TODAS las mesas disponibles 
+	// (filtro las reservadas) pero en lugar de mostrar los números de las mesas, muestro las capacidades 
+	// esto es porque me sirve para mostrar opciones y hacer un cálculo sobre la capacidad restante del sector para armar 
+	// una mesa.
+
 
 	const nmPersons = req.body.nmPersons;
 	const idSection = req.body.idSection;
-	const tmReserve = req.body.dtReserve;
-
-	const dayStart = new Date(tmReserve.split('T')[0]);
+	const tmReserve = req.body.dtReserve; // utc
+	const dayStart = new Date(tmReserve);
 	const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
 	const intervals = [...Array(24).keys()]; // 0-23 
 
 	let compatibleTables: number[] = []; // ie. [2,3,5,8] -> only compatible tables
@@ -228,50 +237,6 @@ async function readAvailability(req: Request, res: Response) {
 	let scheduledTickets: Ticket[] = []; // tickets agendados para el día seleccionado y que tengan mesas compatibles asignadas
 	let availability: availability[] = []; // return availability
 
-
-
-	// Get ALL scheduled tickets
-	await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd } })
-		.then(resp => scheduledTickets = resp)
-		.catch(() => {
-			return res.status(500).json({
-				ok: false,
-				msg: 'Error al obtener los tickets en la agenda',
-				availability
-			})
-		})
-
-
-	if (nmPersons > 0) {
-
-		// COMPATIBLE TABLES
-		await Table.find({ id_section: idSection, nm_persons: { $gte: nmPersons } })
-			.then(resp => compatibleTables = resp.map(table => table.nm_table))
-			.catch(() => {
-				return res.status(500).json({
-					ok: false,
-					msg: 'Error al obtener las mesas compatibles',
-					availability
-				})
-			})
-
-		// TICKETS WITH COMPATIBLE TABLES ASSIGNED
-		await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd }, cd_tables: { $in: compatibleTables } })
-			.then(resp => {
-				scheduledTickets = resp
-			})
-			.catch(() => {
-				return res.status(500).json({
-					ok: false,
-					msg: 'Error al obtener los tickets en la agenda',
-					availability
-				})
-			})
-
-	}
-
-	// 1. Si no hay mesas compatibles, devuelvo TODAS las CAPACIDADES de cada mesa disponible por intervalo para analizar la posibilidad de armar una mesa especial
-	// 2. Si hay mesas que cumplen la capacidad solicitada se devuelve la disponibilidad SOLO de esas mesas por intervalo.
 
 	// ALL TABLES
 	await Table.find({ id_section: idSection })
@@ -290,11 +255,57 @@ async function readAvailability(req: Request, res: Response) {
 		})
 
 
-	// FILTER BUSY TABLES
+	// COMPATIBLE TABLES
+	await Table.find({ id_section: idSection, nm_persons: { $gte: nmPersons } })
+		.then(resp => compatibleTables = resp.map(table => table.nm_table))
+		.catch(() => {
+			return res.status(500).json({
+				ok: false,
+				msg: 'Error al obtener las mesas compatibles',
+				availability
+			})
+		})
+
+	if (compatibleTables.length > 0) {
+		// TICKETS WITH COMPATIBLE TABLES ASSIGNED
+		await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd }, cd_tables: { $in: compatibleTables } })
+			.then(resp => {
+				scheduledTickets = resp
+			})
+			.catch(() => {
+				return res.status(500).json({
+					ok: false,
+					msg: 'Error al obtener los tickets en la agenda',
+					availability
+				})
+			})
+
+	} else {
+
+		// ALL TICKETS
+		await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd } })
+			.then(resp => {
+				scheduledTickets = resp
+			})
+			.catch(() => {
+				return res.status(500).json({
+					ok: false,
+					msg: 'Error al obtener los tickets en la agenda',
+					availability
+				})
+			})
+	}
+
+	// FILTER BUSY TABLES BY INTERVAL
 	for (let hr of intervals) {
 
+		// SI HAY MESAS COMPATIBLES MIS MESAS DISPONIBLES SON LAS MESAS COMPATIBLES, SINO SINO TODAS LAS MESAS
 		let availableTables: number[] = compatibleTables.length > 0 ? compatibleTables : sectionTables;
+
+		// TICKETS PARA ESE INTERVALO		
 		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getHours() === hr);
+
+		// FILTRO LAS MESAS RESERVADAS
 		for (let ticket of scheduledTicketsInterval) { // for each scheduled ticket
 			for (let table of ticket.cd_tables) { // for each table assigned in that ticket
 				if (availableTables.includes(table)) { // remove table from my available tables list
@@ -302,10 +313,13 @@ async function readAvailability(req: Request, res: Response) {
 				}
 			}
 		}
+
+
 		if (compatibleTables.length > 0) {
-			availability.push({ interval: hr, tables: availableTables, capacity: 0 })
+			availability.push({ interval: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hr), tables: availableTables, capacity: 0 })
 		} else {
 
+			// array de mesas disponibles
 			let newTables: tablesData[] = [];
 			for (let table of sectionTablesFull) {
 				if (availableTables.includes(table.nmTable)) {
@@ -314,35 +328,58 @@ async function readAvailability(req: Request, res: Response) {
 					newTables.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: true })
 				}
 			}
+
 			// por la unión de mesas resto 2 personas por mesa, luego sumo 2 personas que entran en los extremos.
 			let arrcapacity = newTables
 				.filter(table => table.blReserved === false)
 				.map(table => table.nmPersons < 4 ? 4 : table.nmPersons) //asumo que las mesas con menos de 4 son de 4
-
-			const capacity: number  = arrcapacity.reduce((a, b) => a + b) - (arrcapacity.length * 2) + 2;
-			availability.push({ interval: hr, tables: newTables, capacity })
+			const capacity: number = arrcapacity.reduce((a, b) => a + b) - (arrcapacity.length * 2) + 2;
+			availability.push({ interval: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hr), tables: newTables, capacity })
 		}
+		
 	}
 
-	/*
-	compatibleTables [ 5 ]
-	sectionTables [ 1, 2, 3, 4, 5 ]
-	sectionTablesFull [
-		{ nmTable: 1, nmPersons: 2 },
-		{ nmTable: 2, nmPersons: 2 },
-		{ nmTable: 3, nmPersons: 4 },
-		{ nmTable: 4, nmPersons: 5 },
-		{ nmTable: 5, nmPersons: 7 }
-	]
-	*/
-
-
-	// If receives tmReserve and that interval continues with available tables after a second check, take first available table and reserve it.
 	return res.status(200).json({
 		ok: compatibleTables.length > 0 ? true : false,
 		msg: 'Disponibilidad obtenida correctamente',
 		availability
 	})
+}
+
+async function readPending(req: Request, res: Response) {
+
+	const idSection = req.body.idSection;
+	const tmReserve = req.body.dtReserve; // utc
+	const dayStart = new Date(tmReserve);
+	const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+	// ALL TICKETS
+	await Ticket.find({ id_section: idSection, tx_status: 'pending', tm_reserve: { $gte: dayStart, $lt: dayEnd } })
+		.then((ticketsDB: Ticket[]) => {
+
+			if (!ticketsDB) {
+				return res.status(200).json({
+					ok: false,
+					msg: 'No se obtuvieron tickets pendientes de asignación en la agenda',
+					pending: null
+				})
+			}
+
+			return res.status(200).json({
+				ok: true,
+				msg: 'Se obtuvieron los tickets pendientes de asignación en la agenda correctamente',
+				pending: ticketsDB
+			})
+
+		})
+		.catch(() => {
+			return res.status(500).json({
+				ok: false,
+				msg: 'Error al obtener los tickets pendientes de asignación en la agenda',
+				pending: null
+			})
+		})
+
 }
 
 async function checkScheduled() {
@@ -382,7 +419,6 @@ async function checkScheduled() {
 			await ticket.save().then((ticketSaved) => {
 				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
 				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
-
 			})
 		}
 
@@ -463,8 +499,8 @@ function createTicket(req: Request, res: Response) {
 
 		let idPosition: Number | null = null;
 
-		// si no es reserva, entonces es espontáneo
-		if (!tmReserve && !tmReserve) {
+		// si no es reserva, entonces es espontáneo y calculo la posición en la cola virtual
+		if (!tmReserve) {
 
 			// busco la posición que le corresponde en la cola virtual
 			let position = await Position.findOneAndUpdate({ id_section: idSection, id_year: thisYear, id_month: thisMonth, id_day: thisDay }, { $inc: { id_position: 1 } }, { new: true });
@@ -498,8 +534,7 @@ function createTicket(req: Request, res: Response) {
 
 		}
 
-
-		const txStatus = (tmReserve || tmReserve) ? 'waiting' : 'queued';
+		const txStatus = tmReserve ? 'waiting' : 'queued';
 
 		// guardo el ticket
 		let ticket = new Ticket({
@@ -616,8 +651,10 @@ async function validateTicketGoogle(req: Request, res: Response) {
 async function validateTicket(idTicket: string, txPlatform: string, idUser: string, txName?: string): Promise<string> {
 
 	return new Promise(async (resolve, reject) => {
+
 		const server = Server.instance; // singleton
 		let response: string = '';
+
 		return await Ticket.findById(idTicket)
 			.populate('id_company')
 			.then(async (ticketWaiting) => {
@@ -673,14 +710,11 @@ async function validateTicket(idTicket: string, txPlatform: string, idUser: stri
 				// No tiene tickets activos para el comercio, se valida el ticket.
 				ticketWaiting.tx_platform = txPlatform;
 				ticketWaiting.id_user = idUser;
-
-				// Si la mesa solicitada es -1 se trata de un scheduled_requested
-				ticketWaiting.tx_status = ticketWaiting.cd_tables[0] === -1 ? 'pending' : 'scheduled';
-
+				ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
 
 				await ticketWaiting.save().then((ticketSaved: Ticket) => {
 					if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); }
-					const idTable = ticketWaiting.cd_tables[0];
+					const idTable = ticketWaiting.cd_tables[0] || 'solicitada';
 					const txCompanyName = ticketWaiting.id_company.tx_company_name;
 					const txCompanyAddressStreet = ticketWaiting.id_company.tx_address_street;
 					const txCompanyAddressNumber = ticketWaiting.id_company.tx_address_number;
@@ -709,11 +743,11 @@ async function validateTicket(idTicket: string, txPlatform: string, idUser: stri
 					https://saturno.fun/public/tickets/${txPlatform}/${idUser}
 					`}
 
-					resolve(response);
+					return resolve(response);
 				})
 
 			}).catch(() => {
-				reject('Error al confirmar el ticket o el ticket fué cancelado.');
+				return reject('Error al confirmar el ticket o el ticket fué cancelado.');
 			})
 	})
 
@@ -906,6 +940,7 @@ function updateSocket(req: Request, res: Response) {
 
 export = {
 	readAvailability,
+	readPending,
 	createTicket,
 	validateTicketGoogle,
 	validateTicket,

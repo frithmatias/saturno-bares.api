@@ -167,8 +167,61 @@ let toggleTableStatus = (req: Request, res: Response) => {
 }
 
 
+let assignTablesPending = (req: Request, res: Response) => {
 
-let assignTables = (req: Request, res: Response) => {
+    var { idTicket, blPriority, cdTables } = req.body;
+
+    Ticket.findById(idTicket).then(async ticketDB => {
+        if (!ticketDB) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No existe el ticket que desea asignar',
+                ticket: null
+            })
+        }
+
+
+        ticketDB.cd_tables = cdTables;
+        ticketDB.tx_status = 'scheduled';
+        ticketDB.bl_priority = blPriority;
+
+        ticketDB.save().then(ticketSaved => {
+
+            if (!ticketSaved) {
+                return res.status(400).json({
+                    ok: false,
+                    msg: 'Error guardar el ticket',
+                    ticket: null
+                })
+            }
+
+            if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); // mesas proveídas
+
+            return res.status(200).json({
+                ok: true,
+                msg: 'Mesas asignadas correctamente',
+                ticket: ticketSaved
+            })
+
+        }).catch(() => {
+
+            return res.status(400).json({
+                ok: false,
+                msg: 'Error guardar el ticket',
+                ticket: null
+            })
+
+        })
+
+
+
+
+    })
+
+
+}
+
+let assignTablesRequested = (req: Request, res: Response) => {
 
     var { idTicket, blPriority, blFirst, cdTables } = req.body;
 
@@ -198,32 +251,25 @@ let assignTables = (req: Request, res: Response) => {
 
         ticketDB.save().then(ticketSaved => {
 
-            if (!ticketSaved) {
-                return res.status(400).json({
-                    ok: false,
-                    msg: 'Error guardar el ticket',
-                    ticket: null
-                })
-            }
-
             server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
-            
+
             if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
 
             if (blPriority || blFirst) {
 
                 let tablesToProvide: Table[] = [];
 
+                // obtengo las mesas para pasarle a provide()
                 if (ticketSaved.tx_status === 'queued') {
-                    tablesToProvide = [compatibles[0]];
+                    tablesToProvide = [compatibles[0]]; // todo: debe tomar la mesa mas compatible, no la primera
                 }
-                
+
                 else if (ticketSaved.tx_status === 'assigned') {
                     tablesToProvide = tables.filter(table => ticketDB.cd_tables?.includes(table.nm_table));
                 }
 
                 else if (ticketSaved.tx_status === 'requested' || cdTables.length === 0) {
-                   return res.status(200).json({
+                    return res.status(200).json({
                         ok: true,
                         msg: 'El ticket quedo requerido a la espera de asignación',
                         tables: null
@@ -255,6 +301,14 @@ let assignTables = (req: Request, res: Response) => {
                     tables: null
                 })
             }
+        }).catch(() => {
+
+            return res.status(400).json({
+                ok: false,
+                msg: 'Error guardar el ticket',
+                ticket: null
+            })
+
         })
     })
 }
@@ -280,6 +334,7 @@ export = {
     createTable,
     readTables,
     toggleTableStatus,
-    assignTables,
+    assignTablesPending,
+    assignTablesRequested,
     deleteTable
 }
