@@ -18,6 +18,8 @@ ticketRoutes.get('/readticket/:idTicket', ticketController.readTicket);
 ticketRoutes.post('/callwaiter', ticketController.callWaiter);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
 ticketRoutes.post('/validateticketgoogle', ticketController.validateTicketGoogle);
+ticketRoutes.post('/validateticketfacebook', ticketController.validateTicketFacebook);
+
 ticketRoutes.post('/endticket', ticketController.endTicket);
 
 // waiter routes

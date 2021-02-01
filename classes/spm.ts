@@ -91,105 +91,106 @@ export default class Spm {
             // busco el primer turno (sin filtro por cantidad de comensales)
             Ticket.find({
                 id_section: table.id_section,
-                tm_start: { $gt: time },
+                // Con la creación de agenda, los tickets pueden haber sido creados ANTES que la fecha de hoy
+                //  tm_start: { $gt: time }, 
                 tm_provided: null,
                 tm_att: null,
                 tm_end: null
             })
-            .then(async (ticketsDB: Ticket[]) => {
+                .then(async (ticketsDB: Ticket[]) => {
 
-                // No hay tickets en espera la mesa queda IDLE.
-                if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
+                    // No hay tickets en espera la mesa queda IDLE.
+                    if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
 
-                // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
+                    // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
 
-                // AUTOMATIC MODE 
-                // 1. primer 'assigned' que le corresponda la mesa con priority true
-                // 2A. primer 'queued' compatible con la mesa con priority true
-                // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' compatible con la mesa 
+                    // AUTOMATIC MODE 
+                    // 1. primer 'assigned' que le corresponda la mesa con priority true
+                    // 2A. primer 'queued' compatible con la mesa con priority true
+                    // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' compatible con la mesa 
 
-                // MANUAL AUTOMATIC
-                // 1. primer 'assigned' que le corresponda la mesa con priority true
-                // 2B. primer 'assigned' que le corresponda la mesa 
-
-                // declaro el ticket, si lo encuentro se lo voy a pasar a provide()
-                let ticketToProvide: Ticket;
-
-                // 1. (AUTO ON AND OFF)
-                ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
-                    ticket.tx_status === 'assigned' &&
-                    ticket.cd_tables?.includes(table.nm_table) &&
-                    ticket.bl_priority === true
-                )[0];
-
-                // obtengo las configuraciones para el comercio
-                const settings = await Settings.findOne({ id_company: ticketsDB[0].id_company });
-
-                if (settings?.bl_spm_auto) {
-                    // AUTO ON
-                    // 2A.
-                    if (!ticketToProvide) {
-                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
-                            ticket.tx_status === 'queued' &&
-                            ticket.nm_persons <= table.nm_persons &&
-                            ticket.bl_priority === true
-                        )[0];
-                    }
-
-                    // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' de características compatibles con la mesa 
-                    if (!ticketToProvide) {
-                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
-                            (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table)) ||
-                            (ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)
-                        )[0];
-                    }
-
-                } else {
-                    // AUTO OFF
+                    // MANUAL AUTOMATIC
+                    // 1. primer 'assigned' que le corresponda la mesa con priority true
                     // 2B. primer 'assigned' que le corresponda la mesa 
-                    if (!ticketToProvide) {
-                        ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
-                            (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table))
-                        )[0];
+
+                    // declaro el ticket, si lo encuentro se lo voy a pasar a provide()
+                    let ticketToProvide: Ticket;
+
+                    // 1. (AUTO ON AND OFF)
+                    ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
+                        ticket.tx_status === 'assigned' &&
+                        ticket.cd_tables?.includes(table.nm_table) &&
+                        ticket.bl_priority === true
+                    )[0];
+
+                    // obtengo las configuraciones para el comercio
+                    const settings = await Settings.findOne({ id_company: ticketsDB[0].id_company });
+
+                    if (settings?.bl_spm_auto) {
+                        // AUTO ON
+                        // 2A.
+                        if (!ticketToProvide) {
+                            ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
+                                ticket.tx_status === 'queued' &&
+                                ticket.nm_persons <= table.nm_persons &&
+                                ticket.bl_priority === true
+                            )[0];
+                        }
+
+                        // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' de características compatibles con la mesa 
+                        if (!ticketToProvide) {
+                            ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
+                                (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table)) ||
+                                (ticket.tx_status === 'queued' && ticket.nm_persons <= table.nm_persons)
+                            )[0];
+                        }
+
+                    } else {
+                        // AUTO OFF
+                        // 2B. primer 'assigned' que le corresponda la mesa 
+                        if (!ticketToProvide) {
+                            ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
+                                (ticket.tx_status === 'assigned' && ticket.cd_tables?.includes(table.nm_table))
+                            )[0];
+                        }
+
                     }
 
-                }
 
-                
-                // Encontró un ticket para proveerle la mesa.
-                if (ticketToProvide) {
-                    if (ticketToProvide.tx_status === 'assigned') {
-                        
-                        // si es 'assigned' el camarero le asigno mas de una mesa, 
-                        // busco TODAS las mesas en el ticket y se las paso a provide()
-                        Table.find({
-                            id_section: table.id_section,
-                            nm_table: { $in: ticketToProvide.cd_tables }
-                        }).then(tablesDB => {
-                            Spm.provide(tablesDB, ticketToProvide).then((resp: string) => {
+                    // Encontró un ticket para proveerle la mesa.
+                    if (ticketToProvide) {
+                        if (ticketToProvide.tx_status === 'assigned') {
+
+                            // si es 'assigned' el camarero le asigno mas de una mesa, 
+                            // busco TODAS las mesas en el ticket y se las paso a provide()
+                            Table.find({
+                                id_section: table.id_section,
+                                nm_table: { $in: ticketToProvide.cd_tables }
+                            }).then(tablesDB => {
+                                Spm.provide(tablesDB, ticketToProvide).then((resp: string) => {
+                                    return resolve(resp)
+                                }).catch((resp) => {
+                                    return reject(resp)
+                                })
+                            })
+                        }
+
+                        // si es 'queued' el sistema le asigno una mesa única
+                        else if (ticketToProvide.tx_status === 'queued') {
+                            Spm.provide([table], ticketToProvide).then((resp: string) => {
                                 return resolve(resp)
                             }).catch((resp) => {
                                 return reject(resp)
                             })
-                        })
+                        }
+
+                    } else {
+
+                        return resolve('No hay tickets para asignar a esta mesa')
+
                     }
 
-                    // si es 'queued' el sistema le asigno una mesa única
-                    else if (ticketToProvide.tx_status === 'queued') {
-                        Spm.provide([table], ticketToProvide).then((resp: string) => {
-                            return resolve(resp)
-                        }).catch((resp) => {
-                            return reject(resp)
-                        })
-                    }
-
-                } else {
-
-                    return resolve('No hay tickets para asignar a esta mesa')
-
-                }
-
-            })
+                })
         })
     }
 
@@ -237,7 +238,6 @@ export default class Spm {
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
                                     const server = Server.instance; // singleton
-                                    console.log('PROVIDE:', ticket.id_company, ticket.id_socket_client)
                                     server.io.to(ticket.id_company).emit('update-waiters');
                                     if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);

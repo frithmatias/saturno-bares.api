@@ -42,8 +42,8 @@ export const escucharTelegram = (bot: TelegramBot) => {
 
         ticket.validateTicket(idTicket, txPlatform, idUser, txName).then((resp: string) => {
             bot.sendMessage(idUser, resp);
-        }).catch(() => {
-            bot.sendMessage(idUser, 'Ocurrió un error al validar tu ticket, por favor volvé a intentar mas tarde.')
+        }).catch((err) => {
+            bot.sendMessage(idUser, err)
         })
 
     });
