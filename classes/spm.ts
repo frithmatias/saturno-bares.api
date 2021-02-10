@@ -194,14 +194,13 @@ export default class Spm {
         })
     }
 
-
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
         return new Promise(async (resolve, reject) => {
 
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
-                    if (table.tx_status === 'idle') {
+                    if (table.tx_status === 'idle' || table.tx_status === 'paused') {
                         table.tx_status = 'reserved';
                         await table.save();
                     }
@@ -222,24 +221,23 @@ export default class Spm {
                 let idTables: string[] = tables.map(table => table._id);
                 session.id_tables = idTables;
                 session.id_ticket = ticket._id;
-                session.tm_start = + new Date();
+                session.tm_start = new Date();
                 session.save().then(async sessionSaved => {
 
                     for (let [index, table] of tables.entries()) {
-                        table.tx_status = 'busy';
+                        table.tx_status = 'waiting';
                         table.id_session = sessionSaved._id;
 
                         await table.save().then(async tableSaved => {
                             ticket.tx_status = 'provided';
                             ticket.id_session = tableSaved.id_session;
-                            ticket.tx_call = 'card'; // pide la carta
-                            ticket.tm_call = new Date();
                             ticket.tm_provided = new Date();
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
                                     const server = Server.instance; // singleton
-                                    server.io.to(ticket.id_company).emit('update-waiters');
+			                        server.io.to(ticket.id_company).emit('update-waiters');
                                     if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
+
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }
                             }).catch(() => reject('Error guardando nuevo estado de ticket'))

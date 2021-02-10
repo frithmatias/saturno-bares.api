@@ -11,6 +11,7 @@ import Server from '../classes/server';
 import spm from '../classes/spm';
 import cron from 'node-cron';
 import colors from '../global/colors';
+import Spm from '../classes/spm';
 
 cron.schedule('*/10 * * * * *', () => {
 	checkScheduled();
@@ -49,15 +50,21 @@ function releaseTicket(req: Request, res: Response) {
 	const server = Server.instance; // singleton
 
 	let newStatus;
-	if (ticket.cd_tables) {
-		newStatus = ticket.cd_tables.length > 0 ? 'assigned' : 'queued';
+
+	if (ticket.tm_reserve) {
+		newStatus = 'scheduled';
 	} else {
-		newStatus = 'queued';
+		if (ticket.cd_tables) {
+			newStatus = ticket.cd_tables.length > 0 ? 'assigned' : 'queued';
+		} else {
+			newStatus = 'queued';
+		}
 	}
 
 	Ticket.findByIdAndUpdate(ticket._id, {
 		tx_status: newStatus,
 		id_session: null,
+		tm_init: null,
 		tm_provided: null,
 		tm_att: null
 	}).then((ticketCanceled) => {
@@ -70,10 +77,10 @@ function releaseTicket(req: Request, res: Response) {
 			})
 		}
 
-
 		// cierro la sesión de la mesa
 		let idSession = ticketCanceled.id_session;
-		TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(async sessionCanceled => {
+
+		TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
 
 			if (!sessionCanceled) {
 				return res.status(400).json({
@@ -133,7 +140,7 @@ async function endTicket(req: Request, res: Response) {
 
 			let idSession = ticketCanceled.id_session;
 			// si ya tenía asignada una sesión de mesa, pauso la mesa y cierro su sesión.
-			await TableSession.findByIdAndUpdate(idSession, { tm_end: + new Date().getTime() }).then(async sessionCanceled => {
+			await TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
 				// let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
 
 				if (!sessionCanceled) {
@@ -208,7 +215,8 @@ interface availability {
 interface tablesData {
 	nmTable: number,
 	nmPersons: number,
-	blReserved: boolean
+	blReserved: boolean,
+	ticketOwner?: Ticket
 }
 
 async function readAvailability(req: Request, res: Response) {
@@ -301,6 +309,7 @@ async function readAvailability(req: Request, res: Response) {
 
 		// TICKETS PARA ESE INTERVALO		
 		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getHours() === hr);
+
 		// FILTRO LAS MESAS RESERVADAS
 		for (let ticket of scheduledTicketsInterval) { // for each scheduled ticket
 			for (let table of ticket.cd_tables) { // for each table assigned in that ticket
@@ -321,7 +330,8 @@ async function readAvailability(req: Request, res: Response) {
 				if (availableTables.includes(table.nmTable)) {
 					newTables.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: false })
 				} else {
-					newTables.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: true })
+					const ticketOwner = scheduledTicketsInterval.find(ticket => ticket.cd_tables.includes(table.nmTable))
+					newTables.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: true, ticketOwner: ticketOwner })
 				}
 			}
 
@@ -346,6 +356,7 @@ async function readAvailability(req: Request, res: Response) {
 }
 
 async function readPending(req: Request, res: Response) {
+	// obtiene los tickets 'pending', pasaron el estado 'waiting' y esperan asignación de mesa por un admin y pasar a estado 'scheduled'.
 
 	const idSection = req.body.idSection;
 	const tmReserve = req.body.dtReserve; // utc
@@ -411,7 +422,7 @@ async function checkScheduled() {
 		// -------------------------------------------------------------
 		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
 		// -------------------------------------------------------------
-
+		
 		if (ticket.tx_status === 'waiting' && timeToTerminate) {
 			ticket.tx_status = 'terminated';
 			ticket.tm_end = new Date();
@@ -422,18 +433,18 @@ async function checkScheduled() {
 		}
 
 		// -------------------------------------------------------------
-		// IN TIME: PROVIDE TABLE	
+		// IN TIME: PROVIDE TABLES	
 		// -------------------------------------------------------------
 
 		if (ticket.tx_status === 'assigned' && timeToProvide) {
-			Table.findOne({ id_section: ticket.id_section, nm_table: ticket.cd_tables[0] }).then(tableToProvide => {
+			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
 
-				if (!tableToProvide) {
+				if (!tablesToProvide) {
 					return;
 				}
 
-				spm.pull(tableToProvide).then(data => {
-					console.log('System: ', 'Mesa aprovisionada ok', data);
+				spm.provide(tablesToProvide, ticket).then(data => {
+					console.log('CRON IN-TIME: ', data);
 				})
 
 			})
@@ -444,25 +455,37 @@ async function checkScheduled() {
 		// -------------------------------------------------------------
 
 		if (ticket.tx_status === 'scheduled' && timeToReserve) {
-			await Table.findOne({ id_section: ticket.id_section, nm_table: ticket.cd_tables[0] })
-				.then(async tableToReserve => {
+			await Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } })
+				.then(async tablesToReserve => {
 
-					if (!tableToReserve) {
+					if (!tablesToReserve) {
 						return;
 					}
 
-					console.log('System: ', 'Intentando reservar la mesa ', tableToReserve.nm_table, ' en estado ', tableToReserve.tx_status)
+					// TABLES -> RESERVED
+					console.log('System: 2hr remaining, ', 'Guardando el ticket en estado ASIGNADO, reservando las mesas')
 
-					if (tableToReserve?.tx_status !== 'busy') {
-						tableToReserve.tx_status = 'reserved';
-						await tableToReserve.save().then(async () => {
-							ticket.tx_status = 'assigned';
-
-							await ticket.save().then((ticketSaved: Ticket) => {
-								console.log('System: ', 'Mesa reservada y ticket asignado ok')
+					let allReserved = false;
+					for (let [index, table] of tablesToReserve.entries()) {
+						if (table.tx_status === 'idle' || table.tx_status === 'paused') {
+							table.tx_status = 'reserved';
+							await table.save().then(() => {
 								server.io.to(ticket.id_company._id).emit('update-waiters');
-								if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
+
 							})
+						}
+					}
+
+					let tablesReservedCount = tablesToReserve.filter(table => table.tx_status === 'reserved').length;
+					allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
+
+					// si todas las mesas quedaron reservadas dejo el ticket en estado ASSIGNED
+					if (allReserved) {
+						// TICKET -> ASSIGNED
+						ticket.tx_status = 'assigned';
+						await ticket.save().then((ticketSaved: Ticket) => {
+							console.log('System: ', 'Mesas reservadas y ticket asignado ok')
+							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
 						})
 					}
 				})
@@ -475,6 +498,7 @@ async function checkScheduled() {
 
 };
 
+// NULL -> WAITING || QUEUED
 function createTicket(req: Request, res: Response) {
 
 	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables } = req.body;
@@ -533,6 +557,7 @@ function createTicket(req: Request, res: Response) {
 
 		}
 
+		// agenda / cola virtual
 		const txStatus = tmReserve ? 'waiting' : 'queued';
 
 		// guardo el ticket
@@ -563,9 +588,6 @@ function createTicket(req: Request, res: Response) {
 
 			// obtengo las configuraciones para el comercio
 			const settings = await Settings.findOne({ id_company: ticketSaved.id_company });
-
-
-
 
 			if (txStatus === 'queued') {
 				// si spm esta activado hago un push 
@@ -616,188 +638,155 @@ function createTicket(req: Request, res: Response) {
 
 };
 
-async function validateTicketGoogle(req: Request, res: Response) {
+// WAITING -> TERMINATED || PENDING || SCHEDULED
+async function validateTicket(req: Request, res: Response) {
 
 	const idTicket = req.body.idTicket;
-	const gtoken = req.body.gtoken;
-	await user.verify(gtoken).then((googleUser: any) => {
+	const txPlatform = req.body.txPlatform;
+	const txToken = req.body.txToken || null;
+	let idUser = req.body.idUser || null;
+	let txImage = req.body.txImage || null;
+	let txName = req.body.txName || null;
 
-		const txPlatform = 'google';
-		const idUser = googleUser.email;
-		const txName = googleUser.name;
-		const txImage = googleUser.img;
-
-		// El usuario de Google es válido, ahora busco el ticket y lo valido 'waiting' -> 'schedule'
-		validateTicket(idTicket, txPlatform, idUser, txName).then((data: string) => {
-
-			return res.status(200).json({
-				ok: true,
-				msg: data
-			})
-
-		}).catch((err) => {
-
-			return res.status(200).json({
+	if (!txPlatform || !idUser) {
+		if (txPlatform) {
+			return res.status(400).json({
 				ok: false,
-				msg: err
+				msg: `No se pudo obtener el usuario de ${txPlatform} para validar el ticket`,
+				ticket: null
+			})
+		} else {
+			return res.status(400).json({
+				ok: false,
+				msg: `No se recibió la red social para validar el ticket`,
+				ticket: null
+			})
+		}
+	}
+
+	if (txPlatform === 'google' && txPlatform) {
+		await user.verify(txToken).then((googleUser: any) => {
+			idUser = googleUser.email;
+			txName = googleUser.name;
+			txImage = googleUser.img;
+		})
+	}
+
+	const server = Server.instance; // singleton
+
+	return await Ticket.findById(idTicket)
+		.populate('id_company')
+		.then(async (ticketWaiting) => {
+
+			// 1. Verifico que el ticket existe
+			if (!ticketWaiting) {
+				return res.status(400).json({
+					ok: false,
+					msg: 'No existe el ticket a validar.',
+					ticket: ticketWaiting
+				})
+			}
+
+			// 2. Verifico que esté en su estado WAITING
+			if (ticketWaiting.tx_status !== 'waiting') {
+				if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketWaiting); }
+				return res.status(400).json({
+					ok: false,
+					msg: 'El ticket no se encuentra en estado de validación',
+					ticket: ticketWaiting
+				})
+			}
+
+			// Obtengo los tickets activos para el sector y hacer otras verificaciones
+			const ticketsActiveCompany = await Ticket.find({
+				// _id: { $ne: ticketWaiting?._id }, // que no sea el que hay que validar
+				// tx_platform: txPlatform,
+				// id_user: idUser,
+				id_section: ticketWaiting.id_section,
+				tx_status: { $nin: ['cancelled', 'finished', 'terminated'] },
+				id_company: ticketWaiting?.id_company._id,
+				tm_end: null
+			}).then((ticketsActiveCompany: Ticket[]) => {
+				return ticketsActiveCompany;
 			})
 
-		})
-	})
-
-}
-
-async function validateTicketFacebook(req: Request, res: Response) {
-
-	const idTicket = req.body.idTicket;
-	const txPlatform = 'facebook';
-	const idUser = req.body.idUser;
-	const txName = req.body.idTicket;
-	// El usuario de Google es válido, ahora busco el ticket y lo valido 'waiting' -> 'schedule'
-	validateTicket(idTicket, txPlatform, idUser, txName).then((data: string) => {
-
-		return res.status(200).json({
-			ok: true,
-			msg: data
-		})
-
-	}).catch((err) => {
-
-		return res.status(200).json({
-			ok: false,
-			msg: err
-		})
-
-	})
-
-
-}
-
-async function validateTicket(idTicket: string, txPlatform: string, idUser: string, txName?: string): Promise<string> {
-
-	return new Promise(async (resolve, reject) => {
-
-		const server = Server.instance; // singleton
-		let response: string = '';
-
-		return await Ticket.findById(idTicket)
-			.populate('id_company')
-			.then(async (ticketWaiting) => {
-
-				// 1. Verifico que el ticket existe
-				if (!ticketWaiting) {
-					return reject('No existe el ticket o el ticket fué cancelado.');
-				}
-
-				// 2. Verifico que esté en su estado WAITING
-				if (ticketWaiting.tx_status !== 'waiting') {
-					if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketWaiting); }
-					return reject('El ticket no se encuentra en estado de espera de aprobación.');
-				}
-
-				// Obtengo los tickets activos para el sector y hacer otras verificaciones
-				const ticketsActiveCompany = await Ticket.find({
-					// _id: { $ne: ticketWaiting?._id }, // que no sea el que hay que validar
-					// tx_platform: txPlatform,
-					// id_user: idUser,
-					id_section: ticketWaiting.id_section,
-					tx_status: { $nin: ['cancelled', 'finished', 'terminated'] },
-					id_company: ticketWaiting?.id_company._id,
-					tm_end: null
-				}).then((ticketsActiveCompany: Ticket[]) => {
-					return ticketsActiveCompany;
+			// 3. Verifico que el usuario no tenga otro ticket activo para este negocio.
+			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === txPlatform && ticket.id_user === idUser && ticket._id !== idTicket)
+			if (ticketsUser && ticketsUser.length > 0) {
+				ticketWaiting.tx_platform = txPlatform;
+				ticketWaiting.id_user = idUser;
+				ticketWaiting.tx_status = 'terminated';
+				ticketWaiting.tm_end = new Date();
+				return await ticketWaiting.save().then((ticketSaved: Ticket) => {
+					if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
+					return res.status(400).json({
+						ok: false,
+						msg: `Ya tenés un ticket activo para este negocio.`,
+						ticket: ticketWaiting
+					})
 				})
+			}
 
-				// 3. Verifico que el usuario no tenga otro ticket activo para este negocio.
-				const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === txPlatform && ticket.id_user === idUser && ticket._id !== idTicket)
-				if (ticketsUser && ticketsUser.length > 0) {
+			// 4. SOLO si el ticket tiene una mesa compatible asignada verifico que la mesa que quiere reservar todavía esté disponible.
+			if (ticketWaiting.cd_tables.length > 0) {
+				const ticketsTable = ticketsActiveCompany.filter(ticket => ticket.tx_status === 'scheduled' && ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) && ticket.tm_reserve?.getHours() === ticketWaiting.tm_reserve?.getHours() && ticket._id !== ticketWaiting._id)
+				if (ticketsTable && ticketsTable.length > 0) {
 					ticketWaiting.tx_platform = txPlatform;
 					ticketWaiting.id_user = idUser;
 					ticketWaiting.tx_status = 'terminated';
 					ticketWaiting.tm_end = new Date();
 					return await ticketWaiting.save().then((ticketSaved: Ticket) => {
 						if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
-						let response = `Ya tenés un ticket activo para este negocio.`;
-						if (['whatsapp', 'telegram'].includes(txPlatform)) {
-							response += `
-							Podés ver todos tus tickets haciendo click en el siguiente enlace: 
-							https://saturno.fun/public/tickets/${txPlatform}/${idUser}`;
-						}
-						reject(response);
+						return res.status(400).json({
+							ok: false,
+							msg: `La mesa ya fué reservada por otro cliente.`,
+							ticket: ticketWaiting
+						})
 					})
 				}
+			}
 
-				// 4. SOLO si el ticket tiene una mesa compatible asignada verifico que la mesa que quiere reservar todavía esté disponible.
-				if (ticketWaiting.cd_tables.length > 0) {
-					const ticketsTable = ticketsActiveCompany.filter(ticket => ticket.tx_status === 'scheduled' && ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) && ticket.tm_reserve?.getHours() === ticketWaiting.tm_reserve?.getHours() && ticket._id !== ticketWaiting._id)
-					if (ticketsTable && ticketsTable.length > 0) {
-						ticketWaiting.tx_platform = txPlatform;
-						ticketWaiting.id_user = idUser;
-						ticketWaiting.tx_status = 'terminated';
-						ticketWaiting.tm_end = new Date();
-						return await ticketWaiting.save().then((ticketSaved: Ticket) => {
-							if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
-							let response = `El sistema rechazó la reserva. La mesa que intentas reservar acaba de ser confirmada por otro cliente, por favor intenta con otra mesa.`;
-							reject(response);
-						})
-					}
+
+			// No tiene tickets activos para el comercio, se valida el ticket.
+			ticketWaiting.tx_platform = txPlatform;
+			ticketWaiting.id_user = idUser;
+			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
+
+			await ticketWaiting.save().then((ticketSaved: Ticket) => {
+
+				if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); }
+
+				const idCompany = ticketWaiting.id_company._id;
+				ticketWaiting.id_company = null; // el formulario de ticket del comercio requiere del ticket sin popular id_company
+				ticketWaiting.id_company = idCompany;
+
+				// QUEDO AGENDADO Y ASIGNADO
+				let response: string = '';
+				if (ticketSaved.tx_status === 'scheduled') {
+					response = `Reserva confirmada correctamente`
 				}
 
+				// QUEDO AGENDADO COMO REQUERIDO
+				if (ticketSaved.tx_status === 'pending') {
+					response = `Reserva pendiente de aprobación`
+				}
 
-				// No tiene tickets activos para el comercio, se valida el ticket.
-				ticketWaiting.tx_platform = txPlatform;
-				ticketWaiting.id_user = idUser;
-				ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
-
-				await ticketWaiting.save().then((ticketSaved: Ticket) => {
-
-					if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); }
-
-					const idTable = ticketWaiting.cd_tables[0] || 'solicitada';
-					const txCompanyName = ticketWaiting.id_company.tx_company_name;
-					const txCompanyAddressStreet = ticketWaiting.id_company.tx_address_street;
-					const txCompanyAddressNumber = ticketWaiting.id_company.tx_address_number;
-					const txCompanyLocation = ticketWaiting.id_company.tx_company_location;
-					const dtDate = new Date(String(ticketWaiting.tm_reserve));
-					const dtYear = dtDate.getFullYear();
-					const months = ['Enero', 'Febrero', 'Marzo', 'Arbil', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-					const dtMonth = months[dtDate.getMonth()];
-					const dtDay = dtDate.getDate();
-
-					const idCompany = ticketWaiting.id_company._id;
-					ticketWaiting.id_company = null; // el formulario de ticket del comercio requiere del ticket sin popular id_company
-					ticketWaiting.id_company = idCompany;
-
-					// QUEDO AGENDADO Y ASIGNADO
-					let response: string = '';
-					if (ticketSaved.tx_status === 'scheduled') {
-						response = `
-						Hola ${txName}, tu reserva para la mesa ${idTable} quedó confirmada.  
-						Te esperamos en ${txCompanyName}, ${txCompanyAddressStreet} ${txCompanyAddressNumber}, ${txCompanyLocation}
-						Recordá que tenés 30 minutos extra si no llegas antes de las ${dtDate.getHours()}:30hs tu turno quedará finalizado.`
-					}
-
-					// QUEDO AGENDADO COMO REQUERIDO
-					if (ticketSaved.tx_status === 'pending') {
-						response = `
-						Hola ${txName}, tu solicitud quedó pendiente de aprobación. Te vamos a avisar si tu pedido queda confirmado en agenda 
-						lo antes posible y por el mismo medio que usaste para validar el ticket.`
-					}
-
-					if (['whatsapp', 'telegram'].includes(txPlatform)) {
-						response += `
-						Para ver el estado de tus tickets visitá este link:
-						https://saturno.fun/public/tickets/${txPlatform}/${idUser}
-					`}
-					return resolve(response);
-
-
+				return res.status(200).json({
+					ok: true,
+					msg: response,
+					ticket: ticketWaiting
 				})
 
-			}).catch(() => {
-				return reject('Error al confirmar el ticket o el ticket fué cancelado.');
+
 			})
-	})
+
+		}).catch(() => {
+			return res.status(400).json({
+				ok: false,
+				msg: 'Error al confirmar el ticket o el ticket fué cancelado.',
+				ticket: null
+			})
+		})
 
 }
 
@@ -991,8 +980,6 @@ export = {
 	readAvailability,
 	readPending,
 	createTicket,
-	validateTicketGoogle,
-	validateTicketFacebook,
 	validateTicket,
 	callWaiter,
 	releaseTicket,

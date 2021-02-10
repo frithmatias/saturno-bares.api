@@ -5,6 +5,7 @@ import { Ticket } from '../models/ticket.model';
 import spm from '../classes/spm';
 
 import Server from '../classes/server';
+import { TableSession } from '../models/table.session.model';
 const server = Server.instance; // singleton
 
 // ========================================================
@@ -166,8 +167,61 @@ let toggleTableStatus = (req: Request, res: Response) => {
     })
 }
 
+let initTables = async (req: Request, res: Response) => {
 
+    let idTables = req.body.idTables;
+
+    await Table.find({ _id: { $in: idTables } }).then(async tablesDB => {
+
+        if (!tablesDB) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No existe la mesa que desea inicializar',
+                table: null
+            })
+        }
+
+        const section = await Section.findById(tablesDB[0]?.id_section);
+        const session = await TableSession.findById(tablesDB[0]?.id_session);
+        const ticket = await Ticket.findById(session?.id_ticket);
+
+        if (!section || !session || !ticket) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No se pudo obtener el ticket para asignarle estado de inicialización.',
+                table: null
+            })
+        }
+
+        ticket.tm_init = new Date();
+        await ticket.save();
+
+        for (let table of tablesDB) {
+            table.tx_status = 'busy';
+            await table.save();
+        }
+
+        server.io.to(section.id_company).emit('update-waiters');
+
+        if (ticket.id_socket_client) { 
+            server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); 
+        }
+
+        return res.status(200).json({
+            ok: true,
+            msg: `Las mesas se inicializaron correctamente`,
+            tables: tablesDB
+        })
+
+
+    })
+
+}
+
+
+// ADMIN: PENDING <-> SCHEDULED -> LO TOMA EL CRON
 let assignTablesPending = (req: Request, res: Response) => {
+    // asigna mesas a pendientes en agenda 
 
     var { idTicket, blPriority, cdTables } = req.body;
 
@@ -182,7 +236,8 @@ let assignTablesPending = (req: Request, res: Response) => {
 
 
         ticketDB.cd_tables = cdTables;
-        ticketDB.tx_status = 'scheduled';
+        // puedo asignar o desasignar
+        ticketDB.tx_status = cdTables.length === 0 ? 'pending' : 'scheduled';
         ticketDB.bl_priority = blPriority;
 
         ticketDB.save().then(ticketSaved => {
@@ -195,7 +250,7 @@ let assignTablesPending = (req: Request, res: Response) => {
                 })
             }
 
-            if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); // mesas proveídas
+            if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); } // mesas proveídas
 
             return res.status(200).json({
                 ok: true,
@@ -212,16 +267,12 @@ let assignTablesPending = (req: Request, res: Response) => {
             })
 
         })
-
-
-
-
     })
-
-
 }
 
+// WAITER: REQUESTED <-> ASSIGNED -> LO TOMA SPM
 let assignTablesRequested = (req: Request, res: Response) => {
+    // asigna mesas a requeridos en cola virtual 
 
     var { idTicket, blPriority, blFirst, cdTables } = req.body;
 
@@ -235,30 +286,62 @@ let assignTablesRequested = (req: Request, res: Response) => {
             })
         }
 
+        // si des-asigno verifico las mesas del sector, si no hay compatibles queda 'requested'
         let tables = await Table.find({ id_section: ticketDB.id_section })
         let compatibles = tables.filter(table => table.nm_persons >= ticketDB.nm_persons);
         let newStatus;
 
-        if (cdTables.length === 0) { // des-asigno las mesas y vuelve al estado anterior
+
+        if (cdTables.length === 0) {
+            // waiter des-asigna todas
             newStatus = compatibles.length === 0 ? 'requested' : 'queued';
         } else {
+            // waiter asigna o re-asigna
             newStatus = 'assigned';
         }
 
-        ticketDB.cd_tables = cdTables;
+        // MESAS RESERVADAS PARA TICKETS EN AGENDA:
+        // si waiter RE-asigna mesas y esas mesas estaban reservadas (el cron las reservo para el cliente)
+        // entonces des-reserva las des-asignadas 
+        // agarro las mesas que tenía, y le saco las nuevas las que quedan las des-reserva
+        if (ticketDB.tx_status === 'assigned' && cdTables.length > 0) { 
+            // ambos asignados, de agenda y cola virtual, pueden tener reservas
+
+            //1. DES-RESERVA DES-ASIGNADAS: obtengo las mesas del ticket que no estan incluidas en cdTables (mesas nuevas)
+            //en ticket [1,2,3] nuevas [3,4] obtiene [1,2]
+            const missingTables = ticketDB.cd_tables.filter(table => !cdTables.includes(table))
+            let tablesToPause = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: missingTables }, tx_status: 'reserved' });
+
+            if (tablesToPause.length > 0) {
+                for (let table of tablesToPause) {
+                    table.tx_status = 'paused';
+                    await table.save();
+                }
+            }
+            //2. RESERVA NUEVAS ASIGNADAS:
+            //en ticket [1,2,3] nuevas [3,4] obtiene [4]
+            const newTables = cdTables.filter((table: number) => !ticketDB.cd_tables.includes(table))
+            let tablesToReserve = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: newTables }, tx_status: { $ne: 'busy' } });
+
+            if (tablesToReserve.length > 0) {
+                for (let table of tablesToReserve) {
+                    table.tx_status = 'reserved';
+                    await table.save();
+                }
+            }
+        }
+
+        ticketDB.cd_tables = cdTables; // asigno las mesas nuevas al ticket
         ticketDB.tx_status = newStatus;
         ticketDB.bl_priority = blPriority;
-
         ticketDB.save().then(ticketSaved => {
-
             server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
-
+ 
             if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
-
+ 
             if (blPriority || blFirst) {
-
+ 
                 let tablesToProvide: Table[] = [];
-
                 // obtengo las mesas para pasarle a provide()
                 if (ticketSaved.tx_status === 'queued') {
                     tablesToProvide = [compatibles[0]]; // todo: debe tomar la mesa mas compatible, no la primera
@@ -277,6 +360,7 @@ let assignTablesRequested = (req: Request, res: Response) => {
                 }
 
                 spm.provide(tablesToProvide, ticketSaved).then((resp) => {
+
                     return res.status(200).json({
                         ok: true,
                         msg: resp,
@@ -334,6 +418,7 @@ export = {
     createTable,
     readTables,
     toggleTableStatus,
+    initTables,
     assignTablesPending,
     assignTablesRequested,
     deleteTable

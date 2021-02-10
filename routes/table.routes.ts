@@ -14,6 +14,7 @@ tableRoutes.get('/readtables/:idCompany', mdAuth.verificaToken, TableController.
 // WAITER
 tableRoutes.get('/toggletablestatus/:idTable', mdAuth.verificaToken, TableController.toggleTableStatus);
 tableRoutes.post('/assigntablesrequested', mdAuth.verificaToken, TableController.assignTablesRequested);
+tableRoutes.post('/initTables', mdAuth.verificaToken, TableController.initTables);
 
 // ADMIN
 tableRoutes.post('/createtable', mdAuth.verificaToken, TableController.createTable);

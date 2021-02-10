@@ -20,6 +20,7 @@ const ticketsSchema = new Schema({
 
     tm_reserve: { type: Date, required: false },
     tm_start: { type: Date, required: true, default: + new Date() },
+    tm_init: { type: Date, required: false, default: null },
     tm_call: { type: Date, required: false, default: null },
     tm_provided: { type: Date, required: false, default: null },
     tm_att: { type: Date, required: false, default: null },
@@ -44,6 +45,7 @@ export interface Ticket extends Document {
     id_socket_waiter?: string | null;
     tm_reserve: Date | null,
     tm_start: Date;
+    tm_init: Date | null;
     tm_call: Date | null;
     tm_provided?: Date | null;
     tm_att?: Date | null;
