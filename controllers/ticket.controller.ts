@@ -67,9 +67,9 @@ function releaseTicket(req: Request, res: Response) {
 		tm_init: null,
 		tm_provided: null,
 		tm_att: null
-	}).then((ticketCanceled) => {
+	}, {new: true}).then((ticketReleased) => {
 
-		if (!ticketCanceled) {
+		if (!ticketReleased) {
 			return res.status(400).json({
 				ok: false,
 				msg: "No se pudo guardar el ticket con su estado anterior",
@@ -77,12 +77,17 @@ function releaseTicket(req: Request, res: Response) {
 			})
 		}
 
+
+		if(ticketReleased.id_socket_client){
+			server.io.to(ticketReleased.id_socket_client).emit('update-ticket', ticketReleased);
+		}
+
 		// cierro la sesión de la mesa
-		let idSession = ticketCanceled.id_session;
+		let idSession = ticket.id_session;
 
-		TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
+		TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async tableSessionCancelled => {
 
-			if (!sessionCanceled) {
+			if (!tableSessionCancelled) {
 				return res.status(400).json({
 					ok: false,
 					msg: "No se pudo cancelar la sesión de la mesa",
@@ -91,13 +96,12 @@ function releaseTicket(req: Request, res: Response) {
 			}
 
 			// libero las mesas del ticket
-			for (let idTable of sessionCanceled?.id_tables) {
+			for (let idTable of tableSessionCancelled?.id_tables) {
 				await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
 			}
 
-
-			server.io.to(ticketCanceled.id_company).emit('update-waiters');
-			server.io.to(ticketCanceled.id_company).emit('update-clients');
+			// ticket released, update waiters table list
+			server.io.to(ticketReleased.id_company).emit('update-waiters');
 
 			return res.status(200).json({
 				ok: true,
@@ -126,22 +130,24 @@ async function endTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 	const reqBy = req.body.reqBy;
 	const newStatus = reqBy === 'waiter' ? 'finished' : 'cancelled';
-	await Ticket.findByIdAndUpdate(idTicket, { tx_status: newStatus, tm_end: new Date() }, { new: true }).then(async (ticketCanceled) => {
+	await Ticket.findByIdAndUpdate(idTicket, { tx_status: newStatus, tm_end: new Date() }, { new: true })
+	.populate('id_section')
+	.then(async (ticketCancelled) => {
 
-		if (!ticketCanceled) {
+		if (!ticketCancelled) {
 			return res.status(400).json({
 				ok: false,
 				msg: 'No se puedo cancelar el ticket',
-				ticket: ticketCanceled
+				ticket: ticketCancelled
 			})
 		}
 
-		if (ticketCanceled?.id_session) {
+		if (ticketCancelled?.id_session) {
 
-			let idSession = ticketCanceled.id_session;
+			let idSession = ticketCancelled.id_session;
 			// si ya tenía asignada una sesión de mesa, pauso la mesa y cierro su sesión.
 			await TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
-				// let new_status = ticketCanceled.tm_att === null ? 'idle' : 'paused';
+				// let new_status = ticketCancelled.tm_att === null ? 'idle' : 'paused';
 
 				if (!sessionCanceled) {
 					return;
@@ -153,10 +159,9 @@ async function endTicket(req: Request, res: Response) {
 				}
 
 				const server = Server.instance; // singleton
-				server.io.to(ticketCanceled.id_company).emit('update-waiters');
-				server.io.to(ticketCanceled.id_company).emit('update-clients'); //ticket component
-				if (ticketCanceled.id_socket_client) {
-					server.io.to(ticketCanceled.id_socket_client).emit('update-ticket', ticketCanceled); // ticket-create component
+				server.io.to(ticketCancelled.id_company).emit('update-waiters');
+				if (ticketCancelled.id_socket_client) {
+					server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
 				}
 
 				return res.status(200).json({
@@ -178,15 +183,15 @@ async function endTicket(req: Request, res: Response) {
 		} else {
 
 			const server = Server.instance; // singleton
-			server.io.to(ticketCanceled.id_company).emit('update-waiters');
-			server.io.to(ticketCanceled.id_company).emit('update-clients'); //ticket component
-			if (ticketCanceled.id_socket_client) {
-				server.io.to(ticketCanceled.id_socket_client).emit('update-ticket', ticketCanceled); // ticket-create component
+			server.io.to(ticketCancelled.id_company).emit('update-waiters');
+			server.io.to(ticketCancelled.id_company).emit('update-clients'); //ticket component
+			if (ticketCancelled.id_socket_client) {
+				server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
 			}
 			return res.status(200).json({
 				ok: true,
 				msg: "Ticket finalizado correctamente",
-				ticket: ticketCanceled
+				ticket: ticketCancelled
 			})
 		}
 
@@ -443,8 +448,9 @@ async function checkScheduled() {
 					return;
 				}
 
+				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
 				spm.provide(tablesToProvide, ticket).then(data => {
-					console.log('CRON IN-TIME: ', data);
+					server.io.to(ticket.id_company._id).emit('update-waiters');
 				})
 
 			})
@@ -463,15 +469,13 @@ async function checkScheduled() {
 					}
 
 					// TABLES -> RESERVED
-					console.log('System: 2hr remaining, ', 'Guardando el ticket en estado ASIGNADO, reservando las mesas')
-
+					// CRON 2HRS LEFT: asignando ticket y reservando mesas... 
 					let allReserved = false;
 					for (let [index, table] of tablesToReserve.entries()) {
 						if (table.tx_status === 'idle' || table.tx_status === 'paused') {
 							table.tx_status = 'reserved';
 							await table.save().then(() => {
 								server.io.to(ticket.id_company._id).emit('update-waiters');
-
 							})
 						}
 					}
@@ -484,7 +488,8 @@ async function checkScheduled() {
 						// TICKET -> ASSIGNED
 						ticket.tx_status = 'assigned';
 						await ticket.save().then((ticketSaved: Ticket) => {
-							console.log('System: ', 'Mesas reservadas y ticket asignado ok')
+							
+							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
 							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
 						})
 					}
@@ -946,9 +951,6 @@ function updateSocket(req: Request, res: Response) {
 		ticketDB.save().then((ticketUpdated) => {
 			// antes de enviar el ticket actualizado al solicitante, tengo que 
 			// avisarle a la otra parte, que tiene que actualizar el ticket. 
-			if (requestUpdateTo) {
-				server.io.to(requestUpdateTo).emit('socket-updated', { idTicket: ticketDB._id, idSocket: newSocket });
-			}
 
 			return res.status(200).json({
 				ok: true,

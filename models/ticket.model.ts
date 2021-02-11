@@ -38,7 +38,7 @@ export interface Ticket extends Document {
     tx_platform: string | null;
     id_user: string | null;
     tx_call: string | null;
-    tx_status: string; // Virtual: [queued, requested, assigned, provided, finished, terminated], Scheduled: [waiting, scheduled, assigned, provided, finished, terminated]
+    tx_status: string; // Virtual: [queued, requested, assigned, provided, finished, terminated], Scheduled: [waiting, scheduled, assigned, provided, finished, terminated], killed
     cd_tables: number[]; //for requested and assigned tickets
     id_position: number | null;
     id_socket_client: string | null;

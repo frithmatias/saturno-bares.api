@@ -237,7 +237,6 @@ export default class Spm {
                                     const server = Server.instance; // singleton
 			                        server.io.to(ticket.id_company).emit('update-waiters');
                                     if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
-
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }
                             }).catch(() => reject('Error guardando nuevo estado de ticket'))

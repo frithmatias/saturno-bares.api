@@ -167,8 +167,52 @@ let toggleTableStatus = (req: Request, res: Response) => {
     })
 }
 
-let initTables = async (req: Request, res: Response) => {
 
+// ADMIN 
+let resetTable = async (req: Request, res: Response) => {
+    // el camarero inicializa las mesas en estado "waiting" (el cliente llegó a la mesa)
+    let idTable = req.body.idTable;
+
+    await Table.findByIdAndUpdate(idTable, {tx_status: 'paused', id_session: null}).then(async tableUpdated => {
+
+        if (!tableUpdated) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No existe la mesa que desea resetear',
+                table: null
+            })
+        }
+
+        if(!tableUpdated.id_session){
+            return res.status(200).json({
+                ok: true,
+                msg: 'Mesa sin sesión reseteada correctamente',
+                table: null
+            })
+        }
+
+        const session = await TableSession.findByIdAndUpdate(tableUpdated?.id_session, {tm_end: new Date()});
+        const ticket = await Ticket.findByIdAndUpdate(session?.id_ticket, {tm_end: new Date(), tx_status: 'killed'}, {new: true});
+
+        if (ticket?.id_socket_client) {
+                server.io.to(ticket.id_socket_client).emit('update-ticket', ticket);
+        }
+
+        return res.status(200).json({
+            ok: true,
+            msg: `La mesa y la sesión fueron reseteadas correctamente`,
+            table: tableUpdated
+        })
+
+
+    })
+
+}
+
+
+// WAITER
+let initTables = async (req: Request, res: Response) => {
+    // el camarero inicializa las mesas en estado "waiting" (el cliente llegó a la mesa)
     let idTables = req.body.idTables;
 
     await Table.find({ _id: { $in: idTables } }).then(async tablesDB => {
@@ -202,9 +246,8 @@ let initTables = async (req: Request, res: Response) => {
         }
 
         server.io.to(section.id_company).emit('update-waiters');
-
-        if (ticket.id_socket_client) { 
-            server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); 
+        if (ticket.id_socket_client) {
+                server.io.to(ticket.id_socket_client).emit('update-ticket', ticket);
         }
 
         return res.status(200).json({
@@ -217,7 +260,6 @@ let initTables = async (req: Request, res: Response) => {
     })
 
 }
-
 
 // ADMIN: PENDING <-> SCHEDULED -> LO TOMA EL CRON
 let assignTablesPending = (req: Request, res: Response) => {
@@ -304,7 +346,7 @@ let assignTablesRequested = (req: Request, res: Response) => {
         // si waiter RE-asigna mesas y esas mesas estaban reservadas (el cron las reservo para el cliente)
         // entonces des-reserva las des-asignadas 
         // agarro las mesas que tenía, y le saco las nuevas las que quedan las des-reserva
-        if (ticketDB.tx_status === 'assigned' && cdTables.length > 0) { 
+        if (ticketDB.tx_status === 'assigned' && cdTables.length > 0) {
             // ambos asignados, de agenda y cola virtual, pueden tener reservas
 
             //1. DES-RESERVA DES-ASIGNADAS: obtengo las mesas del ticket que no estan incluidas en cdTables (mesas nuevas)
@@ -336,11 +378,11 @@ let assignTablesRequested = (req: Request, res: Response) => {
         ticketDB.bl_priority = blPriority;
         ticketDB.save().then(ticketSaved => {
             server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
- 
+
             if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
- 
+
             if (blPriority || blFirst) {
- 
+
                 let tablesToProvide: Table[] = [];
                 // obtengo las mesas para pasarle a provide()
                 if (ticketSaved.tx_status === 'queued') {
@@ -418,6 +460,7 @@ export = {
     createTable,
     readTables,
     toggleTableStatus,
+    resetTable,
     initTables,
     assignTablesPending,
     assignTablesRequested,

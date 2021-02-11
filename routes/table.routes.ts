@@ -17,6 +17,7 @@ tableRoutes.post('/assigntablesrequested', mdAuth.verificaToken, TableController
 tableRoutes.post('/initTables', mdAuth.verificaToken, TableController.initTables);
 
 // ADMIN
+tableRoutes.post('/resettable', mdAuth.verificaToken, TableController.resetTable);
 tableRoutes.post('/createtable', mdAuth.verificaToken, TableController.createTable);
 tableRoutes.delete('/deletetable/:idTable', mdAuth.verificaToken, TableController.deleteTable);
 tableRoutes.post('/assigntablespending', mdAuth.verificaToken, TableController.assignTablesPending);
