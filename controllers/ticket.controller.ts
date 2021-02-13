@@ -67,7 +67,7 @@ function releaseTicket(req: Request, res: Response) {
 		tm_init: null,
 		tm_provided: null,
 		tm_att: null
-	}, {new: true}).then((ticketReleased) => {
+	}, { new: true }).then((ticketReleased) => {
 
 		if (!ticketReleased) {
 			return res.status(400).json({
@@ -78,7 +78,7 @@ function releaseTicket(req: Request, res: Response) {
 		}
 
 
-		if(ticketReleased.id_socket_client){
+		if (ticketReleased.id_socket_client) {
 			server.io.to(ticketReleased.id_socket_client).emit('update-ticket', ticketReleased);
 		}
 
@@ -131,79 +131,79 @@ async function endTicket(req: Request, res: Response) {
 	const reqBy = req.body.reqBy;
 	const newStatus = reqBy === 'waiter' ? 'finished' : 'cancelled';
 	await Ticket.findByIdAndUpdate(idTicket, { tx_status: newStatus, tm_end: new Date() }, { new: true })
-	.populate('id_section')
-	.then(async (ticketCancelled) => {
+		.populate('id_section')
+		.then(async (ticketCancelled) => {
 
-		if (!ticketCancelled) {
-			return res.status(400).json({
-				ok: false,
-				msg: 'No se puedo cancelar el ticket',
-				ticket: ticketCancelled
-			})
-		}
+			if (!ticketCancelled) {
+				return res.status(400).json({
+					ok: false,
+					msg: 'No se puedo cancelar el ticket',
+					ticket: ticketCancelled
+				})
+			}
 
-		if (ticketCancelled?.id_session) {
+			if (ticketCancelled?.id_session) {
 
-			let idSession = ticketCancelled.id_session;
-			// si ya tenía asignada una sesión de mesa, pauso la mesa y cierro su sesión.
-			await TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
-				// let new_status = ticketCancelled.tm_att === null ? 'idle' : 'paused';
+				let idSession = ticketCancelled.id_session;
+				// si ya tenía asignada una sesión de mesa, pauso la mesa y cierro su sesión.
+				await TableSession.findByIdAndUpdate(idSession, { tm_end: new Date() }).then(async sessionCanceled => {
+					// let new_status = ticketCancelled.tm_att === null ? 'idle' : 'paused';
 
-				if (!sessionCanceled) {
-					return;
-				}
+					if (!sessionCanceled) {
+						return;
+					}
 
-				// en una sesión de mesa puedo tener asignadas una o mas mesas
-				for (let idTable of sessionCanceled?.id_tables) {
-					await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
-				}
+					// en una sesión de mesa puedo tener asignadas una o mas mesas
+					for (let idTable of sessionCanceled?.id_tables) {
+						await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
+					}
+
+					const server = Server.instance; // singleton
+					server.io.to(ticketCancelled.id_company).emit('update-waiters');
+					if (ticketCancelled.id_socket_client) {
+						server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
+					}
+
+					return res.status(200).json({
+						ok: true,
+						msg: "Ticket finalalizado correctamente",
+						ticket: null
+					})
+
+				}).catch(() => {
+
+					return res.status(400).json({
+						ok: false,
+						msg: "No se pudo cancelar la sesion de mesa",
+						ticket: null
+					})
+
+				})
+
+			} else {
 
 				const server = Server.instance; // singleton
 				server.io.to(ticketCancelled.id_company).emit('update-waiters');
+				server.io.to(ticketCancelled.id_company).emit('update-clients'); //ticket component
 				if (ticketCancelled.id_socket_client) {
 					server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
 				}
-
 				return res.status(200).json({
 					ok: true,
-					msg: "Ticket finalalizado correctamente",
-					ticket: null
+					msg: "Ticket finalizado correctamente",
+					ticket: ticketCancelled
 				})
-
-			}).catch(() => {
-
-				return res.status(400).json({
-					ok: false,
-					msg: "No se pudo cancelar la sesion de mesa",
-					ticket: null
-				})
-
-			})
-
-		} else {
-
-			const server = Server.instance; // singleton
-			server.io.to(ticketCancelled.id_company).emit('update-waiters');
-			server.io.to(ticketCancelled.id_company).emit('update-clients'); //ticket component
-			if (ticketCancelled.id_socket_client) {
-				server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
 			}
-			return res.status(200).json({
-				ok: true,
-				msg: "Ticket finalizado correctamente",
-				ticket: ticketCancelled
+
+
+
+		}).catch(() => {
+			return res.status(400).json({
+				ok: false,
+				msg: "No se pudo finalizar el ticket",
+				ticket: null
 			})
-		}
-
-
-
-	}).catch(() => {
-		return res.status(400).json({
-			ok: false,
-			msg: "No se pudo finalizar el ticket",
-			ticket: null
 		})
-	})
 }
 
 // ========================================================
@@ -427,7 +427,7 @@ async function checkScheduled() {
 		// -------------------------------------------------------------
 		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
 		// -------------------------------------------------------------
-		
+
 		if (ticket.tx_status === 'waiting' && timeToTerminate) {
 			ticket.tx_status = 'terminated';
 			ticket.tm_end = new Date();
@@ -488,7 +488,7 @@ async function checkScheduled() {
 						// TICKET -> ASSIGNED
 						ticket.tx_status = 'assigned';
 						await ticket.save().then((ticketSaved: Ticket) => {
-							
+
 							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
 							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
 						})
@@ -503,18 +503,20 @@ async function checkScheduled() {
 
 };
 
-// NULL -> WAITING || QUEUED
 function createTicket(req: Request, res: Response) {
+	// SCHEDULE -> WAITING 
+	// ADMIN(SCHEDULE) -> SCHEDULED 
+	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables } = req.body;
+	console.log(req.body);
+	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, idUser } = req.body;
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
 
-	const dateReserve = + new Date(tmReserve);
-
+	const dateReserve = new Date(tmReserve);
 	Section.findById(idSection).then(async sectionDB => {
 
 		if (!sectionDB) {
@@ -563,7 +565,7 @@ function createTicket(req: Request, res: Response) {
 		}
 
 		// agenda / cola virtual
-		const txStatus = tmReserve ? 'waiting' : 'queued';
+		const txStatus = tmReserve ? (blContingent ? 'scheduled' : 'waiting') : 'queued';
 
 		// guardo el ticket
 		let ticket = new Ticket({
@@ -575,16 +577,18 @@ function createTicket(req: Request, res: Response) {
 			bl_priority: false,
 			tx_name: txName,
 			tx_platform: null,
+			id_user: idUser, //phone client, only for scheduled contingency tickets
 			tx_call: null,
-			tm_call: null,
 			tx_status: txStatus,
 			cd_tables: cdTables || [],
 			id_position: idPosition || null, // if tx_status:'scheduled' -> idPosition = null
 			id_socket_client: idSocket,
 			id_socket_waiter: null,
-			tm_start: + new Date().getTime(),
-			tm_provided: null,
 			tm_reserve: dateReserve || null,
+			tm_start: + new Date().getTime(),
+			tm_init: null,
+			tm_call: null,
+			tm_provided: null,
 			tm_att: null,
 			tm_end: null
 		})
@@ -596,9 +600,7 @@ function createTicket(req: Request, res: Response) {
 
 			if (txStatus === 'queued') {
 				// si spm esta activado hago un push 
-				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Spm desactivado, el ticket quedo en cola o agendado.';
-
-				// envío pedido de actualización despues del push
+				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
 
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
@@ -610,14 +612,22 @@ function createTicket(req: Request, res: Response) {
 
 			} else if (txStatus === 'waiting') {
 
-				// let contactResp: string = await contact.whatsapp(ticket);
+				return res.status(201).json({
+					ok: true,
+					msg: 'Ticket esperando confirmación',
+					ticket
+				});
+
+			} else if (txStatus === 'scheduled') {
 
 				return res.status(201).json({
 					ok: true,
-					msg: 'Ticket guardado y a confirmar',
+					msg: 'Ticket guardado y agendado',
 					ticket
 				});
+
 			}
+
 
 
 
