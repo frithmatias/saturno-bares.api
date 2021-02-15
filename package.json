@@ -26,6 +26,7 @@
 		"mongoose-unique-validator": "^2.0.3",
 		"node-cron": "^2.0.3",
 		"node-telegram-bot-api": "^0.51.0",
+		"nodemailer": "^6.4.18",
 		"nodemon": "^2.0.7",
 		"rxjs": "^6.6.3",
 		"socket.io": "^2.3.0",
@@ -44,6 +45,7 @@
 		"@types/mongoose-unique-validator": "^1.0.4",
 		"@types/node-cron": "^2.0.3",
 		"@types/node-telegram-bot-api": "^0.51.0",
+		"@types/nodemailer": "^6.4.0",
 		"@types/socket.io": "^2.1.11",
 		"@types/web-push": "^3.3.0"
 	}

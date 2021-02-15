@@ -12,10 +12,221 @@ import spm from '../classes/spm';
 import cron from 'node-cron';
 import colors from '../global/colors';
 import Spm from '../classes/spm';
+import nodemailer from 'nodemailer';
+import { environment } from '../global/environment';
+import moment from 'moment';
 
+// run cron
 cron.schedule('*/10 * * * * *', () => {
 	checkScheduled();
 })
+
+// set moment locales
+moment.locale('es');
+
+// const reserve = "2021-02-25T00:00:00.000Z";
+// console.log(moment(reserve).format('DD [de] MMMM [a las] HH:mm')) // 24 de febrero a las 21:00
+// console.log(moment(reserve).fromNow()); // en 9 dias
+
+// ========================================================
+// interfaces
+// ========================================================
+
+interface availability {
+	interval: Date;
+	tables: number[] | tablesData[];
+	capacity: number | null; // -> number when has NOT compatible tables, null has compatible options  
+}
+
+interface tablesData {
+	nmTable: number,
+	nmPersons: number,
+	blReserved: boolean,
+	ticketOwner?: Ticket
+}
+
+
+// ========================================================
+// system methods
+// ========================================================
+
+async function sendMail(type: string, email: string, message: string) {
+
+	let MAILER_SENDER;
+	switch (type) {
+		case 'reservas':
+			MAILER_SENDER = environment.MAILER_RESERVAS;
+			break;
+		case 'registro':
+			MAILER_SENDER = environment.MAILER_REGISTRO;
+			break;
+		default:
+			MAILER_SENDER = environment.MAILER_ADMIN;
+			break;
+	}
+
+	const MAILER_FROM = '"Saturno Fun" < ' + MAILER_SENDER + '>';
+	const MAILER_SUBJECT = 'Información sobre tu reserva';
+
+	let transporter = nodemailer.createTransport({
+		host: environment.MAILER_HOST,
+		port: environment.MAILER_PORT,
+		secure: false, // true for 465, false for other ports
+		auth: {
+			user: environment.MAILER_RESERVAS, // generated ethereal user
+			pass: environment.MAILER_PASS, // generated ethereal password
+		},
+	});
+
+	let info = await transporter.sendMail({
+		from: MAILER_FROM, // sender address
+		to: email, // list of receivers
+		subject: MAILER_SUBJECT, // Subject line
+		text: message, // plain text body
+		//  html: "<b>Hello world?</b>", // html body
+	});
+
+	// console.log('Mensaje enviado a ', email, info);
+
+}
+
+async function checkScheduled() {
+	const server = Server.instance; // singleton
+
+	let scheduledTickets: Ticket[] = [];
+
+	await Ticket.find({ tm_reserve: { $ne: null }, tm_provided: null, tm_end: null })
+		.populate('id_company')
+		.then(data => {
+			scheduledTickets = data;
+		}).catch(() => {
+		})
+
+	let waiting = scheduledTickets.filter(ticket => ticket.tx_status === 'waiting');
+	let scheduled = scheduledTickets.filter(ticket => ticket.tx_status === 'scheduled');
+	let assigned = scheduledTickets.filter(ticket => ticket.tx_status === 'assigned');
+
+	console.log(`${colors.FgBlue}System:${colors.Reset}`, 'waiting:', waiting.length, ' scheduled: ', scheduled.length, ' assigned: ', assigned.length);
+
+	for (let ticket of scheduledTickets) {
+		if (!ticket.tm_reserve) {
+			return;
+		}
+
+
+
+		// relative reservetion time from now to define event
+		const now = +new Date().getTime();
+		const timeToProvide = (ticket.tm_reserve?.getTime() - now) <= 0;
+		const timeToReserve = (ticket.tm_reserve?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
+		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
+
+		// company and reservation data for mail pourposes
+		const txPlatform = ticket.tx_platform;
+		const idUser = ticket.id_user;
+		const txName = ticket.tx_name;
+		const txCompanyName = ticket.id_company.tx_company_name;
+		const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
+		const cdTables = ticket.cd_tables;
+		const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
+		const tmReserve = moment(ticket.tm_reserve).format('DD [de] MMMM [a las] HH:mm');
+		const tmRemaining = moment(ticket.tm_reserve).fromNow();
+
+
+		// -------------------------------------------------------------
+		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'waiting' && timeToTerminate) {
+			ticket.tx_status = 'terminated';
+			ticket.tm_end = new Date();
+			await ticket.save().then((ticketSaved) => {
+				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
+				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
+			})
+		}
+
+		// -------------------------------------------------------------
+		// IN TIME: PROVIDE TABLES	
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'assigned' && timeToProvide) {
+			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
+
+				if (!tablesToProvide) {
+					return;
+				}
+
+				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
+				spm.provide(tablesToProvide, ticket).then(data => {
+					server.io.to(ticket.id_company._id).emit('update-waiters');
+				})
+
+			})
+		}
+
+		// -------------------------------------------------------------
+		// BEFORE 2HS AT TM_RESERVE: TABLE RESERVE AND TICKET ASSIGN
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'scheduled' && timeToReserve) {
+			await Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } })
+				.then(async tablesToReserve => {
+
+					if (!tablesToReserve) {
+						return;
+					}
+
+					// TABLES -> RESERVED
+					// CRON 2HRS LEFT: asignando ticket y reservando mesas... 
+					let allReserved = false;
+					for (let [index, table] of tablesToReserve.entries()) {
+						if (table.tx_status === 'idle' || table.tx_status === 'paused') {
+							table.tx_status = 'reserved';
+							await table.save().then(() => {
+								server.io.to(ticket.id_company._id).emit('update-waiters');
+							})
+						}
+					}
+
+					let tablesReservedCount = tablesToReserve.filter(table => table.tx_status === 'reserved').length;
+					allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
+
+					// si todas las mesas quedaron reservadas dejo el ticket en estado ASSIGNED
+					if (allReserved) {
+						// TICKET -> ASSIGNED
+						ticket.tx_status = 'assigned';
+						await ticket.save().then((ticketSaved: Ticket) => {
+
+							if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve && idUser) {
+								const messageToUser = `
+								Hola ${txName}, tus mesas en ${txCompanyName} estan reservadas !. 
+								Te esperamos en ${txCompanyAddress} el ${tmReserve} en ${cdTablesStr} ${cdTables}.
+			
+								(${tmRemaining}) 
+								
+								Para ver todas tus reservas o cancelarlas por favor hace click aquí:
+								https://saturno.fun/public/tickets
+			
+								Muchas Gracias!
+								Saturno.fun
+								`
+								sendMail('reservas', idUser, messageToUser);
+							}
+
+							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
+							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
+						})
+					}
+				})
+
+		}
+
+
+	}
+
+
+};
 
 // ========================================================
 // waiter methods
@@ -210,20 +421,6 @@ async function endTicket(req: Request, res: Response) {
 // public methods
 // ========================================================
 
-
-interface availability {
-	interval: Date;
-	tables: number[] | tablesData[];
-	capacity: number | null; // -> number when has NOT compatible tables, null has compatible options  
-}
-
-interface tablesData {
-	nmTable: number,
-	nmPersons: number,
-	blReserved: boolean,
-	ticketOwner?: Ticket
-}
-
 async function readAvailability(req: Request, res: Response) {
 	// si existe una mesa con capacidad para cumplir con el requerimiento de nmPersons, entonces devuelvo 
 	// POR CADA INTERVALO un tipo de 'availability' con tables:[3,5,7] que son las mesas compatibles y disponibles 
@@ -397,118 +594,11 @@ async function readPending(req: Request, res: Response) {
 
 }
 
-async function checkScheduled() {
-	const server = Server.instance; // singleton
-
-	let scheduledTickets: Ticket[] = [];
-
-	await Ticket.find({ tm_reserve: { $ne: null }, tm_provided: null, tm_end: null })
-		.populate('id_company')
-		.then(data => {
-			scheduledTickets = data;
-		}).catch(() => {
-		})
-
-	let waiting = scheduledTickets.filter(ticket => ticket.tx_status === 'waiting');
-	let scheduled = scheduledTickets.filter(ticket => ticket.tx_status === 'scheduled');
-	let assigned = scheduledTickets.filter(ticket => ticket.tx_status === 'assigned');
-
-	console.log(`${colors.FgBlue}System:${colors.Reset}`, 'waiting:', waiting.length, ' scheduled: ', scheduled.length, ' assigned: ', assigned.length);
-
-	for (let ticket of scheduledTickets) {
-		if (!ticket.tm_reserve) {
-			return;
-		}
-		const now = +new Date().getTime();
-		const timeToProvide = (ticket.tm_reserve?.getTime() - now) <= 0;
-		const timeToReserve = (ticket.tm_reserve?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
-		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
-
-		// -------------------------------------------------------------
-		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
-		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'waiting' && timeToTerminate) {
-			ticket.tx_status = 'terminated';
-			ticket.tm_end = new Date();
-			await ticket.save().then((ticketSaved) => {
-				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
-				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
-			})
-		}
-
-		// -------------------------------------------------------------
-		// IN TIME: PROVIDE TABLES	
-		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'assigned' && timeToProvide) {
-			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
-
-				if (!tablesToProvide) {
-					return;
-				}
-
-				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
-				spm.provide(tablesToProvide, ticket).then(data => {
-					server.io.to(ticket.id_company._id).emit('update-waiters');
-				})
-
-			})
-		}
-
-		// -------------------------------------------------------------
-		// BEFORE 2HS AT TM_RESERVE: TABLE RESERVE AND TICKET ASSIGN
-		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'scheduled' && timeToReserve) {
-			await Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } })
-				.then(async tablesToReserve => {
-
-					if (!tablesToReserve) {
-						return;
-					}
-
-					// TABLES -> RESERVED
-					// CRON 2HRS LEFT: asignando ticket y reservando mesas... 
-					let allReserved = false;
-					for (let [index, table] of tablesToReserve.entries()) {
-						if (table.tx_status === 'idle' || table.tx_status === 'paused') {
-							table.tx_status = 'reserved';
-							await table.save().then(() => {
-								server.io.to(ticket.id_company._id).emit('update-waiters');
-							})
-						}
-					}
-
-					let tablesReservedCount = tablesToReserve.filter(table => table.tx_status === 'reserved').length;
-					allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
-
-					// si todas las mesas quedaron reservadas dejo el ticket en estado ASSIGNED
-					if (allReserved) {
-						// TICKET -> ASSIGNED
-						ticket.tx_status = 'assigned';
-						await ticket.save().then((ticketSaved: Ticket) => {
-
-							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
-							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
-						})
-					}
-				})
-
-		}
-
-
-	}
-
-
-};
-
 function createTicket(req: Request, res: Response) {
 	// SCHEDULE -> WAITING 
 	// ADMIN(SCHEDULE) -> SCHEDULED 
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	console.log(req.body);
 	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, idUser } = req.body;
 	const server = Server.instance; // singleton
 
@@ -653,12 +743,13 @@ function createTicket(req: Request, res: Response) {
 
 };
 
-// WAITING -> TERMINATED || PENDING || SCHEDULED
 async function validateTicket(req: Request, res: Response) {
+	// WAITING -> TERMINATED || PENDING || SCHEDULED
 
 	const idTicket = req.body.idTicket;
 	const txPlatform = req.body.txPlatform;
 	const txToken = req.body.txToken || null;
+	// those vars are not const cause from Google will receive a token to validate
 	let idUser = req.body.idUser || null;
 	let txImage = req.body.txImage || null;
 	let txName = req.body.txName || null;
@@ -679,7 +770,7 @@ async function validateTicket(req: Request, res: Response) {
 		}
 	}
 
-	if (txPlatform === 'google' && txPlatform) {
+	if (txPlatform === 'google') {
 		await user.verify(txToken).then((googleUser: any) => {
 			idUser = googleUser.email;
 			txName = googleUser.name;
@@ -693,6 +784,7 @@ async function validateTicket(req: Request, res: Response) {
 		.populate('id_company')
 		.then(async (ticketWaiting) => {
 
+
 			// 1. Verifico que el ticket existe
 			if (!ticketWaiting) {
 				return res.status(400).json({
@@ -701,6 +793,14 @@ async function validateTicket(req: Request, res: Response) {
 					ticket: ticketWaiting
 				})
 			}
+
+			// company and reservation data for mail pourposes
+			const txCompanyName = ticketWaiting.id_company.tx_company_name;
+			const txCompanyAddress = ticketWaiting.id_company.tx_address_street + ' ' + ticketWaiting.id_company.tx_address_number;
+			const cdTables = ticketWaiting.cd_tables;
+			const cdTablesStr = ticketWaiting.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
+			const tmReserve = moment(ticketWaiting.tm_reserve).format('DD [de] MMMM [a las] HH:mm');
+			const tmRemaining = moment(ticketWaiting.tm_reserve).fromNow();
 
 			// 2. Verifico que esté en su estado WAITING
 			if (ticketWaiting.tx_status !== 'waiting') {
@@ -734,7 +834,7 @@ async function validateTicket(req: Request, res: Response) {
 				ticketWaiting.tm_end = new Date();
 				return await ticketWaiting.save().then((ticketSaved: Ticket) => {
 					if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
-					return res.status(400).json({
+					return res.status(200).json({
 						ok: false,
 						msg: `Ya tenés un ticket activo para este negocio.`,
 						ticket: ticketWaiting
@@ -762,18 +862,13 @@ async function validateTicket(req: Request, res: Response) {
 			}
 
 
-			// No tiene tickets activos para el comercio, se valida el ticket.
+			// Pasó todas las verificaciones anteriores, se valida el ticket.
 			ticketWaiting.tx_platform = txPlatform;
 			ticketWaiting.id_user = idUser;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
 
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
-				if (ticketSaved.id_socket_client) { server.io.to(ticketSaved.id_socket_client).emit('update-ticket', ticketSaved); }
-
-				const idCompany = ticketWaiting.id_company._id;
-				ticketWaiting.id_company = null; // el formulario de ticket del comercio requiere del ticket sin popular id_company
-				ticketWaiting.id_company = idCompany;
 
 				// QUEDO AGENDADO Y ASIGNADO
 				let response: string = '';
@@ -786,10 +881,26 @@ async function validateTicket(req: Request, res: Response) {
 					response = `Reserva pendiente de aprobación`
 				}
 
+				if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve) {
+					const messageToUser = `
+					Hola ${txName}, tu reserva para ${txCompanyName} quedó confirmada!. 
+					Te esperamos en ${txCompanyAddress} el ${tmReserve} en ${cdTablesStr} ${cdTables}.
+
+					(${tmRemaining}) 
+					
+					Podes ver tus tickets haciendo click aquí:
+					https://saturno.fun/public/tickets
+
+					Muchas Gracias!
+					Saturno.fun
+					`
+					sendMail('reservas', idUser, messageToUser);
+				}
+
 				return res.status(200).json({
 					ok: true,
 					msg: response,
-					ticket: ticketWaiting
+					ticket: ticketSaved
 				})
 
 
