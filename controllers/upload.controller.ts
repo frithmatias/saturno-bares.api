@@ -7,6 +7,7 @@ const ftp = require("basic-ftp")
 
 import environment from '../global/environment.prod';
 import { User } from '../models/user.model';
+import path from 'path';
 
 // ========================================================
 // Upload Methods
@@ -73,8 +74,9 @@ async function uploadImagen(req: any, res: Response) {
 
     // (..) in production
     var dirPath = `./uploads/${idDocument}/${idField}`;
-    fileSystem.createFolder(dirPath);
-    let filePath = `${dirPath}/${fileName}`;
+    var completePath = path.resolve(__dirname, '../', dirPath);
+    fileSystem.createFolder(completePath);
+    let filePath = `${completePath}/${fileName}`;
     await archivo.mv(filePath, (err: any) => {
         if (err) {
             return res.status(500).json({
@@ -122,7 +124,9 @@ function deleteImagen(req: Request, res: Response) {
             }
 
             // (..) in production
-            var dirPath = `./uploads/${idDocument}/${idField}`;
+            
+            var dirPath = `../uploads/${idDocument}/${idField}`;
+            var completePath = path.resolve(__dirname, '../', dirPath);
 
             if (idField === 'tx_company_banners') {
                 if (fileName === 'todas') {
@@ -171,7 +175,7 @@ function deleteImagen(req: Request, res: Response) {
                 });
             }
 
-            var dirPath = `./uploads/${idDocument}/${idField}`;
+            var dirPath = `../uploads/${idDocument}/${idField}`;
 
 
             if (idField === 'tx_img') {
@@ -292,7 +296,7 @@ async function syncHostinger(req: Request, res: Response) {
         let idDocument = req.body.idDocument;
         let idField = req.body.idField;
 
-        let dirPath = `./uploads/${idDocument}/${idField}`
+        let dirPath = `../uploads/${idDocument}/${idField}`
 
         const client = new ftp.Client();
         client.ftp.verbose = false; 

@@ -5,28 +5,31 @@ import path from 'path';
 
 const http = require('http');
 
-// frontend <- [HTTP] <- backend <- [FTP] <- hostinger
 async function getImage(req: Request, res: Response) {
     var idCompany = req.params.idCompany;
     var idType = req.params.idType;
     var idFile = req.params.idFile;
-    // ../../ -> tengo que salir de la carpeta 'server' donde transpila TypeScript
-    var pathImage = path.resolve(__dirname, `../../uploads/${idCompany}/${idType}/${idFile}`);
+    var pathImage = path.resolve(__dirname, `../uploads/${idCompany}/${idType}/${idFile}`);
+
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
-        downloadHTTP(idCompany, idType, idFile).then(() => {
-            if (fs.existsSync(pathImage)) {
-                res.sendFile(pathImage);
-            } else {
-                var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
-                res.sendFile(pathNoImage);
-            }
 
-        }).catch(() => {
-            var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
-            res.sendFile(pathNoImage);
-        })
+        var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+        res.sendFile(pathNoImage);
+
+
+        // downloadHTTP(idCompany, idType, idFile).then(() => {
+        //     if (fs.existsSync(pathImage)) {
+        //         res.sendFile(pathImage);
+        //     } else {
+        //         var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+        //         res.sendFile(pathNoImage);
+        //     }
+        // }).catch(() => {
+        //     var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+        //     res.sendFile(pathNoImage);
+        // })
 
     }
 }
@@ -35,7 +38,7 @@ async function getImage(req: Request, res: Response) {
 function downloadHTTP(idCompany: string, idType: string, idFile: string): Promise<void> {
     return new Promise((resolve, reject) => {
         // creo nuevamente la carpeta de usuario en Heroku
-        fileSystem.createFolder(`./uploads/${idCompany}/${idType}`);
+        // fileSystem.createFolder(`./uploads/${idCompany}/${idType}`);
 
         // hago la descarga desde Hostinger de la imágen solicitada a heroku 
         // En el archivo HTACCESS deL storage server tengo que hacer una excepción que evite la redirección 

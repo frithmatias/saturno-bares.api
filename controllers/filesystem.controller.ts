@@ -2,20 +2,18 @@ import fs from 'fs';
 import path from 'path';
 
 function createFolder(dirPath: string) {
-    // ./uploads/aviso
-    // ./uploads/usuario
 
-    // seems like fs works fine with dirPath instead completePath
-    // var completePath = path.resolve(__dirname, '../', dirPath);
+    var dirPath = path.resolve(__dirname, '../', dirPath);
     var existe = fs.existsSync(dirPath);
 
     if (!existe) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
-    // return completePathTemp;
+    
 }
 
 function syncFolder(dirPath: string, filesInDb: string[]): Promise<void> {
+    var dirPath = path.resolve(__dirname, '../', dirPath);
    
     return new Promise(resolve => {
         if (fs.existsSync(dirPath)) {
@@ -32,6 +30,7 @@ function syncFolder(dirPath: string, filesInDb: string[]): Promise<void> {
 }
 
 function deleteFolder(dirPath: string) {
+    var dirPath = path.resolve(__dirname, '../', dirPath);
 
     const deleteFolderRecursive = (dirPath: string) => {
         if (fs.existsSync(dirPath)) {

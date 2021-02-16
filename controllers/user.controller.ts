@@ -21,7 +21,6 @@ function activateUser(req: Request, res: Response) {
   hash = hash.replace(/_slash_/gi, '/')
   hash = hash.replace(/_dot_/gi, '.')
 
-  console.log(hash);
   User.findOne({ tx_email: email }).then(userDB => {
 
     if (!userDB) {

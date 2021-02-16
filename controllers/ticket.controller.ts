@@ -558,13 +558,15 @@ function createTicket(req: Request, res: Response) {
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
 	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, idUser } = req.body;
+	console.log(req.body)
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
 
-	const dateReserve = new Date(tmReserve);
+
+	const dateReserve = tmReserve ? new Date(tmReserve) : null;
 	Section.findById(idSection).then(async sectionDB => {
 
 		if (!sectionDB) {
