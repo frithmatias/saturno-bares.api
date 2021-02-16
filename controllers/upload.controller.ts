@@ -71,6 +71,7 @@ async function uploadImagen(req: any, res: Response) {
     // SAVE FILE IN FILESYSTEM
     // ==============================================================
 
+    // (..) in production
     var dirPath = `./uploads/${idDocument}/${idField}`;
     fileSystem.createFolder(dirPath);
     let filePath = `${dirPath}/${fileName}`;
@@ -101,8 +102,6 @@ async function uploadImagen(req: any, res: Response) {
 
 }
 
-
-
 function deleteImagen(req: Request, res: Response) {
     var idField = req.params.idField;
     var idDocument = req.params.idDocument;
@@ -122,8 +121,8 @@ function deleteImagen(req: Request, res: Response) {
                 });
             }
 
+            // (..) in production
             var dirPath = `./uploads/${idDocument}/${idField}`;
-
 
             if (idField === 'tx_company_banners') {
                 if (fileName === 'todas') {

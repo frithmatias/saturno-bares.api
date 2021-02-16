@@ -8,6 +8,7 @@ var rolesValidos = {
   };
   
 const userSchema = new Schema({
+    bl_active: {type: Boolean, required: false, default: false},
     tx_name: {type: String, required: [true, 'El nombre es necesario']},
     tx_email: {type: String, unique: true, required: [true, 'El email es necesario']},
     tx_password: {type: String, required: [true, 'El password es necesario']},
@@ -16,6 +17,7 @@ const userSchema = new Schema({
     cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
     tx_img: {type: String, required: false},
     bl_google: {type: Boolean, required: true, default: false},
+    bl_facebook: {type: Boolean, required: true, default: false},
     tm_lastlogin: { type: Date, required: false },
     tm_createdat: { type: Date, required: false }
 },{ collection: "users" })
@@ -42,6 +44,7 @@ userSchema.method('getData', function(this: any) {
 
 
 interface User extends Document {
+    bl_active: boolean;
     tx_name: string;
     tx_email: string;
     tx_password: string;
@@ -50,6 +53,7 @@ interface User extends Document {
     cd_pricing: number;
     tx_img: string | null;
     bl_google: boolean;
+    bl_facebook: boolean;
     tm_lastlogin: Date | null;
     tm_createdat: Date;
     getData: () => {};

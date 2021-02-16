@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 
 import Token from '../classes/token';
+import Mail from '../classes/mail';
 import environment from '../global/environment.prod';
 
 import { User } from '../models/user.model';
@@ -12,25 +13,82 @@ var GOOGLE_CLIENT_ID = environment.GOOGLE_CLIENT_ID;
 const { OAuth2Client } = require("google-auth-library");
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+function activateUser(req: Request, res: Response) {
+  // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
+  
+  const email = req.body.email;
+  let hash = req.body.hash;
+  hash = hash.replace(/_slash_/gi, '/')
+  hash = hash.replace(/_dot_/gi, '.')
 
-// ========================================================
-// User Methods
-// ========================================================
+  console.log(hash);
+  User.findOne({ tx_email: email }).then(userDB => {
+
+    if (!userDB) {
+      return res.status(400).json({
+        ok: false,
+        msg: 'No existe el usuario a activar',
+        user: null
+      })
+    }
+
+    if (!bcrypt.compareSync(String(userDB._id), hash)) {
+      return res.status(400).json({
+        ok: false,
+        id: String(userDB._id),
+        hash,
+        msg: "No se pudo validar el usuario."
+      });
+    }
+
+    userDB.bl_active = true;
+    userDB.save().then(userActivated => {
+      return res.status(200).json({
+        ok: true,
+        msg: 'Usuario activado correctamente',
+        user: userActivated
+      })
+    })
+
+  })
+
+
+}
 
 function createUser(req: any, res: Response) {
 
   var body = req.body;
   var user = new User({
+    bl_active: false,
     tx_name: body.user.tx_name,
     tx_email: body.user.tx_email,
     tx_password: bcrypt.hashSync(body.user.tx_password, 10),
     bl_google: false,
+    bl_facebook: false,
     tm_lastlogin: null,
     tm_createdat: new Date(),
     id_role: 'ADMIN_ROLE',
   });
 
   user.save().then((userSaved) => {
+
+    let hash = bcrypt.hashSync(String(userSaved._id), 10);
+    hash = hash.replace(/\//gi, '_slash_')
+    hash = hash.replace(/\./gi, '_dot_')
+    const confirmEmailMessage = `
+Hola ${userSaved.tx_name}, gracias por registrarte en Saturno. 
+
+Para activar tu cuenta por favor hace click aquí:
+
+https://saturno.fun/activate/${userSaved.tx_email}/${hash}`;
+
+
+
+    Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
+      console.log('mail ok', resp);
+    }).catch(err => {
+      console.log('fallo', err)
+    })
 
     res.status(201).json({
       ok: true,
@@ -39,10 +97,9 @@ function createUser(req: any, res: Response) {
     });
 
   }).catch((err) => {
-
     return res.status(400).json({
       ok: false,
-      msg: "Error al guardar el user.",
+      msg: "Error al guardar el usuario.",
       errors: err
     });
 
@@ -129,7 +186,8 @@ async function loginGoogle(req: Request, res: Response) {
       .populate('id_company')
       .then(userDB => {
 
-        if (userDB) {  // el user existe, intenta loguearse
+        if (userDB) {
+          // el user existe, intenta loguearse
 
           if (userDB.bl_google === false) {
 
@@ -198,7 +256,8 @@ async function loginGoogle(req: Request, res: Response) {
 
           }
 
-        } else { // el user no existe, hay que crearlo.
+        } else {
+          // el user no existe, hay que crearlo.
 
           var user = new User();
           user.tx_email = googleUser.email;
@@ -268,7 +327,7 @@ async function loginGoogle(req: Request, res: Response) {
 function loginUser(req: Request, res: Response) {
 
   var body = req.body;
-  User.findOne({ tx_email: body.tx_email })
+  User.findOne({ tx_email: body.tx_email, bl_active: true })
     .populate('id_company')
     .then(userDB => {
 
@@ -523,6 +582,7 @@ function testData(req: Request, res: Response) {
 }
 
 export = {
+  activateUser,
   testData,
   createUser,
   attachCompany,

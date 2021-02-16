@@ -14,6 +14,7 @@ userRoutes.post('/updatetoken', UserController.updateToken);
 userRoutes.post('/google', UserController.loginGoogle);
 userRoutes.post('/login', UserController.loginUser);
 userRoutes.post('/register', UserController.createUser);
+userRoutes.post('/activate', UserController.activateUser);
 userRoutes.post('/checkemailexists', UserController.checkEmailExists);
 userRoutes.post('/attachcompany/:idUser', mdAuth.verificaToken, UserController.attachCompany);
 

@@ -15,6 +15,7 @@ import Spm from '../classes/spm';
 import nodemailer from 'nodemailer';
 import { environment } from '../global/environment';
 import moment from 'moment';
+import Mail from '../classes/mail';
 
 // run cron
 cron.schedule('*/10 * * * * *', () => {
@@ -49,46 +50,6 @@ interface tablesData {
 // ========================================================
 // system methods
 // ========================================================
-
-async function sendMail(type: string, email: string, message: string) {
-
-	let MAILER_SENDER;
-	switch (type) {
-		case 'reservas':
-			MAILER_SENDER = environment.MAILER_RESERVAS;
-			break;
-		case 'registro':
-			MAILER_SENDER = environment.MAILER_REGISTRO;
-			break;
-		default:
-			MAILER_SENDER = environment.MAILER_ADMIN;
-			break;
-	}
-
-	const MAILER_FROM = '"Saturno Fun" < ' + MAILER_SENDER + '>';
-	const MAILER_SUBJECT = 'Información sobre tu reserva';
-
-	let transporter = nodemailer.createTransport({
-		host: environment.MAILER_HOST,
-		port: environment.MAILER_PORT,
-		secure: false, // true for 465, false for other ports
-		auth: {
-			user: environment.MAILER_RESERVAS, // generated ethereal user
-			pass: environment.MAILER_PASS, // generated ethereal password
-		},
-	});
-
-	let info = await transporter.sendMail({
-		from: MAILER_FROM, // sender address
-		to: email, // list of receivers
-		subject: MAILER_SUBJECT, // Subject line
-		text: message, // plain text body
-		//  html: "<b>Hello world?</b>", // html body
-	});
-
-	// console.log('Mensaje enviado a ', email, info);
-
-}
 
 async function checkScheduled() {
 	const server = Server.instance; // singleton
@@ -129,7 +90,6 @@ async function checkScheduled() {
 		const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
 		const cdTables = ticket.cd_tables;
 		const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-		const tmReserve = moment(ticket.tm_reserve).format('DD [de] MMMM [a las] HH:mm');
 		const tmRemaining = moment(ticket.tm_reserve).fromNow();
 
 
@@ -200,18 +160,16 @@ async function checkScheduled() {
 
 							if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve && idUser) {
 								const messageToUser = `
-								Hola ${txName}, tus mesas en ${txCompanyName} estan reservadas !. 
-								Te esperamos en ${txCompanyAddress} el ${tmReserve} en ${cdTablesStr} ${cdTables}.
-			
-								(${tmRemaining}) 
-								
-								Para ver todas tus reservas o cancelarlas por favor hace click aquí:
-								https://saturno.fun/public/tickets
-			
-								Muchas Gracias!
-								Saturno.fun
-								`
-								sendMail('reservas', idUser, messageToUser);
+Hola ${txName}, ya te reservamos ${cdTablesStr} ${cdTables} en ${txCompanyName}!. 
+
+Te esperamos en ${tmRemaining} en ${txCompanyAddress}.
+
+Para ver todas tus reservas o cancelarlas por favor hace click aquí:
+https://saturno.fun/public/tickets
+
+Muchas Gracias!
+Saturno.fun`;
+								Mail.sendMail('reservas', idUser, messageToUser);
 							}
 
 							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
@@ -799,7 +757,6 @@ async function validateTicket(req: Request, res: Response) {
 			const txCompanyAddress = ticketWaiting.id_company.tx_address_street + ' ' + ticketWaiting.id_company.tx_address_number;
 			const cdTables = ticketWaiting.cd_tables;
 			const cdTablesStr = ticketWaiting.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-			const tmReserve = moment(ticketWaiting.tm_reserve).format('DD [de] MMMM [a las] HH:mm');
 			const tmRemaining = moment(ticketWaiting.tm_reserve).fromNow();
 
 			// 2. Verifico que esté en su estado WAITING
@@ -883,18 +840,16 @@ async function validateTicket(req: Request, res: Response) {
 
 				if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve) {
 					const messageToUser = `
-					Hola ${txName}, tu reserva para ${txCompanyName} quedó confirmada!. 
-					Te esperamos en ${txCompanyAddress} el ${tmReserve} en ${cdTablesStr} ${cdTables}.
+Hola ${txName}, la reserva de ${cdTablesStr} ${cdTables} en ${txCompanyName} quedó confirmada.
 
-					(${tmRemaining}) 
-					
-					Podes ver tus tickets haciendo click aquí:
-					https://saturno.fun/public/tickets
+Te esperamos en ${tmRemaining} en ${txCompanyAddress}.
 
-					Muchas Gracias!
-					Saturno.fun
-					`
-					sendMail('reservas', idUser, messageToUser);
+Podés ver o cancelar tus reservas haciendo click aquí:
+https://saturno.fun/public/tickets
+
+Muchas Gracias!
+Saturno.fun`;
+					Mail.sendMail('reservas', idUser, messageToUser);
 				}
 
 				return res.status(200).json({
