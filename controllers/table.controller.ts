@@ -95,7 +95,10 @@ let readTables = (req: Request, res: Response) => {
 
 let toggleTableStatus = (req: Request, res: Response) => {
 
-    let idTable = req.params.idTable;
+    console.log(req.body);
+
+    const idTable = req.body.idTable;
+    const actualStatus = req.body.actualStatus;
 
     Table.findById(idTable).then(async tableDB => {
 
@@ -103,6 +106,15 @@ let toggleTableStatus = (req: Request, res: Response) => {
             return res.status(400).json({
                 ok: false,
                 msg: 'No existe la mesa',
+                table: null
+            })
+        }
+
+
+        if (actualStatus !== tableDB.tx_status) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'El estado de esta mesa había cambiado.',
                 table: null
             })
         }
@@ -116,6 +128,7 @@ let toggleTableStatus = (req: Request, res: Response) => {
                 table: null
             })
         }
+
 
         tableDB.tx_status = tableDB.tx_status === 'idle' ? 'paused' : 'idle';
         tableDB.save().then(statusSaved => {
@@ -149,7 +162,7 @@ let toggleTableStatus = (req: Request, res: Response) => {
 
                 return res.status(200).json({
                     ok: true,
-                    msg: `Estado ${statusSaved.tx_status} guardado correctamente`,
+                    msg: `El nuevo estado fue actualizado correctamente`,
                     table: tableDB
                 })
 

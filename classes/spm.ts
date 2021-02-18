@@ -100,7 +100,7 @@ export default class Spm {
                 .then(async (ticketsDB: Ticket[]) => {
 
                     // No hay tickets en espera la mesa queda IDLE.
-                    if (ticketsDB.length === 0) { return resolve('No hay tickets para esta mesa') }
+                    if (ticketsDB.length === 0) { return resolve('Pull: No hay tickets asignados para esta mesa') }
 
                     // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
 

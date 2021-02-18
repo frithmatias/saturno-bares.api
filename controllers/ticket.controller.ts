@@ -518,26 +518,28 @@ async function readAvailability(req: Request, res: Response) {
 async function readPending(req: Request, res: Response) {
 	// obtiene los tickets 'pending', pasaron el estado 'waiting' y esperan asignación de mesa por un admin y pasar a estado 'scheduled'.
 
-	const idSection = req.body.idSection;
-	const tmReserve = req.body.dtReserve; // utc
-	const dayStart = new Date(tmReserve);
-	const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+	const idCompany = req.body.idCompany;
+	const idYear = req.body.idYear;
+	const idMonth = req.body.idMonth;
 
-	// ALL TICKETS
-	await Ticket.find({ id_section: idSection, tx_status: 'pending', tm_reserve: { $gte: dayStart, $lt: dayEnd } })
+	const firstDay = new Date(idYear, idMonth);
+	const lastDay = new Date(idYear, idMonth + 1);
+
+	await Ticket.find({ id_company: idCompany, tx_status: 'pending', tm_reserve: { $gte: firstDay, $lt: lastDay } })
+		.populate('id_section')
 		.then((ticketsDB: Ticket[]) => {
 
 			if (!ticketsDB) {
 				return res.status(200).json({
 					ok: false,
-					msg: 'No se obtuvieron tickets pendientes de asignación en la agenda',
+					msg: 'No hay pendientes',
 					pending: null
 				})
 			}
 
 			return res.status(200).json({
 				ok: true,
-				msg: 'Se obtuvieron los tickets pendientes de asignación en la agenda correctamente',
+				msg: 'Pendientes obtenidos correctamente',
 				pending: ticketsDB
 			})
 
@@ -545,7 +547,7 @@ async function readPending(req: Request, res: Response) {
 		.catch(() => {
 			return res.status(500).json({
 				ok: false,
-				msg: 'Error al obtener los tickets pendientes de asignación en la agenda',
+				msg: 'Error al obtener los pendientes',
 				pending: null
 			})
 		})
