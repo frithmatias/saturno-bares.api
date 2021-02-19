@@ -10,10 +10,6 @@ import user from './user.controller';
 import Server from '../classes/server';
 import spm from '../classes/spm';
 import cron from 'node-cron';
-import colors from '../global/colors';
-import Spm from '../classes/spm';
-import nodemailer from 'nodemailer';
-import { environment } from '../global/environment';
 import moment from 'moment';
 import Mail from '../classes/mail';
 
@@ -64,17 +60,21 @@ async function checkScheduled() {
 		})
 
 	let waiting = scheduledTickets.filter(ticket => ticket.tx_status === 'waiting');
+	let pending = scheduledTickets.filter(ticket => ticket.tx_status === 'pending');
 	let scheduled = scheduledTickets.filter(ticket => ticket.tx_status === 'scheduled');
 	let assigned = scheduledTickets.filter(ticket => ticket.tx_status === 'assigned');
 
-	console.log(`${colors.FgBlue}System:${colors.Reset}`, 'waiting:', waiting.length, ' scheduled: ', scheduled.length, ' assigned: ', assigned.length);
+	console.log({
+		'waiting': waiting.length,
+		'pending': pending.length,
+		'scheduled': scheduled.length,
+		'assigned': assigned.length,
+	});
 
 	for (let ticket of scheduledTickets) {
 		if (!ticket.tm_reserve) {
 			return;
 		}
-
-
 
 		// relative reservetion time from now to define event
 		const now = +new Date().getTime();
@@ -84,7 +84,7 @@ async function checkScheduled() {
 
 		// company and reservation data for mail pourposes
 		const txPlatform = ticket.tx_platform;
-		const idUser = ticket.id_user;
+		const txEmail = ticket.tx_email;
 		const txName = ticket.tx_name;
 		const txCompanyName = ticket.id_company.tx_company_name;
 		const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
@@ -158,7 +158,7 @@ async function checkScheduled() {
 						ticket.tx_status = 'assigned';
 						await ticket.save().then((ticketSaved: Ticket) => {
 
-							if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve && idUser) {
+							if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve && txEmail) {
 								const messageToUser = `
 Hola ${txName}, ya te reservamos ${cdTablesStr} ${cdTables} en ${txCompanyName}!. 
 
@@ -169,7 +169,7 @@ https://saturno.fun/public/tickets
 
 Muchas Gracias!
 Saturno.fun`;
-								Mail.sendMail('reservas', idUser, messageToUser);
+								Mail.sendMail('reservas', txEmail, messageToUser);
 							}
 
 							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
@@ -559,8 +559,7 @@ function createTicket(req: Request, res: Response) {
 	// ADMIN(SCHEDULE) -> SCHEDULED 
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, idUser } = req.body;
-	console.log(req.body)
+	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, txEmail, nmPhone } = req.body;
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
@@ -629,7 +628,8 @@ function createTicket(req: Request, res: Response) {
 			bl_priority: false,
 			tx_name: txName,
 			tx_platform: null,
-			id_user: idUser, //phone client, only for scheduled contingency tickets
+			tx_email: txEmail, 
+			nm_phone: nmPhone,
 			tx_call: null,
 			tx_status: txStatus,
 			cd_tables: cdTables || [],
@@ -653,7 +653,7 @@ function createTicket(req: Request, res: Response) {
 			if (txStatus === 'queued') {
 				// si spm esta activado hago un push 
 				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
-
+				
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
 				return res.status(201).json({
@@ -712,11 +712,11 @@ async function validateTicket(req: Request, res: Response) {
 	const txPlatform = req.body.txPlatform;
 	const txToken = req.body.txToken || null;
 	// those vars are not const cause from Google will receive a token to validate
-	let idUser = req.body.idUser || null;
+	let txEmail = req.body.txEmail || null;
 	let txImage = req.body.txImage || null;
 	let txName = req.body.txName || null;
 
-	if (!txPlatform || !idUser) {
+	if (!txPlatform || !txEmail) {
 		if (txPlatform) {
 			return res.status(400).json({
 				ok: false,
@@ -734,7 +734,7 @@ async function validateTicket(req: Request, res: Response) {
 
 	if (txPlatform === 'google') {
 		await user.verify(txToken).then((googleUser: any) => {
-			idUser = googleUser.email;
+			txEmail = googleUser.email;
 			txName = googleUser.name;
 			txImage = googleUser.img;
 		})
@@ -777,7 +777,7 @@ async function validateTicket(req: Request, res: Response) {
 			const ticketsActiveCompany = await Ticket.find({
 				// _id: { $ne: ticketWaiting?._id }, // que no sea el que hay que validar
 				// tx_platform: txPlatform,
-				// id_user: idUser,
+				// tx_email: txEmail,
 				id_section: ticketWaiting.id_section,
 				tx_status: { $nin: ['cancelled', 'finished', 'terminated'] },
 				id_company: ticketWaiting?.id_company._id,
@@ -787,10 +787,10 @@ async function validateTicket(req: Request, res: Response) {
 			})
 
 			// 3. Verifico que el usuario no tenga otro ticket activo para este negocio.
-			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === txPlatform && ticket.id_user === idUser && ticket._id !== idTicket)
+			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === txPlatform && ticket.tx_email === txEmail && ticket._id !== idTicket)
 			if (ticketsUser && ticketsUser.length > 0) {
 				ticketWaiting.tx_platform = txPlatform;
-				ticketWaiting.id_user = idUser;
+				ticketWaiting.tx_email = txEmail;
 				ticketWaiting.tx_status = 'terminated';
 				ticketWaiting.tm_end = new Date();
 				return await ticketWaiting.save().then((ticketSaved: Ticket) => {
@@ -808,7 +808,7 @@ async function validateTicket(req: Request, res: Response) {
 				const ticketsTable = ticketsActiveCompany.filter(ticket => ticket.tx_status === 'scheduled' && ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) && ticket.tm_reserve?.getHours() === ticketWaiting.tm_reserve?.getHours() && ticket._id !== ticketWaiting._id)
 				if (ticketsTable && ticketsTable.length > 0) {
 					ticketWaiting.tx_platform = txPlatform;
-					ticketWaiting.id_user = idUser;
+					ticketWaiting.tx_email = txEmail;
 					ticketWaiting.tx_status = 'terminated';
 					ticketWaiting.tm_end = new Date();
 					return await ticketWaiting.save().then((ticketSaved: Ticket) => {
@@ -825,7 +825,7 @@ async function validateTicket(req: Request, res: Response) {
 
 			// Pasó todas las verificaciones anteriores, se valida el ticket.
 			ticketWaiting.tx_platform = txPlatform;
-			ticketWaiting.id_user = idUser;
+			ticketWaiting.tx_email = txEmail;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
 
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
@@ -853,7 +853,7 @@ https://saturno.fun/public/tickets
 
 Muchas Gracias!
 Saturno.fun`;
-					Mail.sendMail('reservas', idUser, messageToUser);
+					Mail.sendMail('reservas', txEmail, messageToUser);
 				}
 
 				return res.status(200).json({
@@ -906,9 +906,9 @@ function callWaiter(req: Request, res: Response) {
 function readUserTickets(req: Request, res: Response) {
 
 	const txPlatform = req.params.txPlatform;
-	const idUser = req.params.idUser;
+	const txEmail = req.params.txEmail;
 
-	Ticket.find({ tx_platform: txPlatform, id_user: idUser, tx_status: { $ne: 'terminated' } })
+	Ticket.find({ tx_platform: txPlatform, tx_email: txEmail, tx_status: { $ne: 'terminated' } })
 		.populate('id_company')
 		.then((userTickets: Ticket[]) => {
 			if (!userTickets) {

@@ -1,12 +1,4 @@
 if (navigator.serviceWorker) {
-
-  // cssLink = document.createElement("link");
-  // cssLink.id = "addToHomeScreen";
-  // cssLink.rel = "stylesheet";
-  // cssLink.type = "text/css";
-  // cssLink.href = "assets/pwa.css";
-  // document.head.appendChild(cssLink);
-
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').then(function (reg) {
       swReg = reg
@@ -63,8 +55,6 @@ btnDesactivadas.addEventListener('click', function () {
 
 // cancel subscription
 function cancelarSuscripcon() {
-  // Como se hace swReg.pushManager.subscribe() pareciera que lo que tenemos que hacer es un 
-  // swReg.pushManager.unsubscribe() pero no, no funciona así, no funciona como un observable de RXJS. 
   swReg.pushManager.getSubscription().then(subs => {
     subs.unsubscribe()
       .then(() => verificaSuscripcion(false));

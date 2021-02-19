@@ -95,8 +95,6 @@ let readTables = (req: Request, res: Response) => {
 
 let toggleTableStatus = (req: Request, res: Response) => {
 
-    console.log(req.body);
-
     const idTable = req.body.idTable;
     const actualStatus = req.body.actualStatus;
 

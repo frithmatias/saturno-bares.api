@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notification.routes';
 import indicatorRoutes from './routes/indicator.routes';
 import metricRoutes from './routes/metric.routes';
 import uploadRoutes from './routes/upload.routes';
+import messengerRoutes from './routes/messenger.routes';
 import imageRoutes from './routes/image.routes';
 import settingsRoutes from './routes/settings.routes'; 
 
@@ -70,6 +71,7 @@ server.app.use('/metrics', metricRoutes);
 server.app.use('/i', indicatorRoutes);
 server.app.use('/scoreitem', scoreItemRoutes);
 server.app.use('/uploads', uploadRoutes);
+server.app.use('/m', messengerRoutes);
 server.app.use('/image', imageRoutes);
 server.app.use('/settings', settingsRoutes);
 

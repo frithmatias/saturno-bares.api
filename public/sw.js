@@ -14,16 +14,16 @@ self.addEventListener('install', e => {
       return cache.addAll([
         '/',
         '/2.0a7aec95f675de12dd1b.js',
-        '/6.115a36b56ee78a77d7b5.js',
-        '/7.7dd53de3a41aeddd1d35.js',
+        '/6.ae1e20374508066d7f0a.js',
+        '/7.017a6c22985a04788991.js',
         '/8.c603a759833412296bba.js',
         '/9.3744b16604a5a6166655.js',
         '/10.eb3d73da0fdb78b9cbe8.js',
         '/admin_schedule.314bfb77a946eb28111c.png',
         '/angular.e6ed573fa80c0dc1bf57.svg',
-        '/common.8802e1127fd2e01f904b.js',
+        '/common.5fe77bff697534929328.js',
         '/javascript.073149757fbeb5b24d7f.svg',
-        '/main.e90d92131e55e42b1b78.js',
+        '/main.db4e22b324737bb66316.js',
         '/mongodb2.fa3a3b8ab3c3f12f2e39.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.164a7b585585bfda7685.js',
@@ -32,9 +32,9 @@ self.addEventListener('install', e => {
         '/public_scores.3357dd204cbe02fd7d91.png',
         '/public_tickets.11b7f154fb8764573190.png',
         '/resto.d59299e0fd9a646201cb.jpg',
-        '/runtime.b2b1fda38de05636b8fd.js',
-        '/saturno-logo.57ae63ddcf4ecf4f438c',
-        '/styles.d62f19d452b60284da9e.css',
+        '/runtime.0c61534c8d75fd53cf9a.js',
+        '/saturno-logo.a06910f315a45a70206d',
+        '/styles.e400a17f61d6c9b4ee9a.css',
         '/telegram.41785cbc399faf2eac6e.svg',
         '/typescript.a6305a733dd55243980a.svg',
         '/waiter_tables.3f32ade65761a1adf34d.png',
@@ -196,8 +196,7 @@ self.addEventListener('push', e => {
       }
     ]
   }
-  // como toda accion en el SW tengo que esperar a que termine de realizar toda la notificación
-  // porque puede demorar unos segundos.
+
   e.waitUntil(self.registration.showNotification(title, options))
 })
 

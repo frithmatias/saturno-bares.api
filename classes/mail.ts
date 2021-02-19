@@ -24,7 +24,7 @@ export default class Mail {
         }
 
         const MAILER_FROM = '"Saturno Fun" < ' + MAILER_SENDER + '>';
-    console.log(MAILER_SENDER)
+
         let transporter = nodemailer.createTransport({
             host: environment.MAILER_HOST,
             port: environment.MAILER_PORT,
@@ -41,6 +41,10 @@ export default class Mail {
             subject: MAILER_SUBJECT, // Subject line
             text: message, // plain text body
             //  html: "<b>Hello world?</b>", // html body
-        });
+        }).then(() => {
+            return 'ENVIADO OK';
+        }).catch(()=> {
+            return 'FALLO ENVIO';
+        })
     }
 }
