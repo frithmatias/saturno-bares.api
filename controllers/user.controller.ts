@@ -7,15 +7,17 @@ import environment from '../global/environment.prod';
 
 import { User } from '../models/user.model';
 import { Menu } from '../models/menu.model';
+import https from 'https';
+import { Social, facebookBackendResponse } from '../models/social.model';
 
 // Google Login
-var GOOGLE_CLIENT_ID = environment.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = environment.GOOGLE_CLIENT_ID;
 const { OAuth2Client } = require("google-auth-library");
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function activateUser(req: Request, res: Response) {
   // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
-  
+
   const email = req.body.email;
   let hash = req.body.hash;
   hash = hash.replace(/_slash_/gi, '/')
@@ -62,8 +64,7 @@ function createUser(req: any, res: Response) {
     tx_name: body.user.tx_name,
     tx_email: body.user.tx_email,
     tx_password: bcrypt.hashSync(body.user.tx_password, 10),
-    bl_google: false,
-    bl_facebook: false,
+    bl_social: false,
     tm_lastlogin: null,
     tm_createdat: new Date(),
     id_role: 'ADMIN_ROLE',
@@ -165,30 +166,95 @@ function updateToken(req: any, res: Response) {
   });
 }
 
-async function verify(token: string) {
-  const ticket = await oauthClient.verifyIdToken({
-    idToken: token,
-    audience: GOOGLE_CLIENT_ID
-  });
-  const payload = ticket.getPayload();
-  return {
-    name: payload.name,
-    email: payload.email,
-    img: payload.picture
-  };
+async function verify(platform: string, token: string) {
+
+  // GOOGLE TOKEN VERIFY
+  if (platform === 'google') {
+    let response = new Promise(async resolve => {
+      const credentials = await oauthClient.verifyIdToken({
+        idToken: token,
+        audience: GOOGLE_CLIENT_ID
+      });
+      // const payload = credentials.getPayload();
+      // return {
+      //   name: payload.name,
+      //   email: payload.email,
+      //   img: payload.picture
+      // };
+      resolve(true);
+    })
+    return response;
+  }
+
+  // FACEBOOK TOKEN VERIFY
+  if (platform === 'facebook') {
+    const app_id = environment.FB_APP_ID;
+    const app_secret = environment.FB_APP_SECRET;
+    const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
+
+    // get app_token
+    let access_token: string = await new Promise((resolve, reject) => {
+
+      https.get(access_token_url, (response: any) => {
+        var body = '';
+        response.on('data', function (chunk: any) {
+          body += chunk;
+        });
+        response.on('end', function () {
+          var fbResponse = JSON.parse(body);
+          resolve(fbResponse.access_token);
+        });
+      });
+
+    })
+
+    // app_token and user_token validation
+    const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
+    let output: facebookBackendResponse = await new Promise((resolve, reject) => {
+      https.get(valid_token, (response: any) => {
+        var body = '';
+        response.on('data', function (chunk: any) {
+          body += chunk;
+        });
+        response.on('end', function () {
+          var fbResponse = JSON.parse(body);
+          resolve(fbResponse);
+        });
+      });
+    })
+
+    return output.data.is_valid ? true : false;
+
+  }
 }
 
-async function loginGoogle(req: Request, res: Response) {
-  var gtoken = req.body.gtoken;
-  await verify(gtoken).then((googleUser) => {
-    User.findOne({ tx_email: googleUser.email })
+
+
+async function loginSocial(req: Request, res: Response) {
+
+  const token = req.body.token;
+  const socialUser: Social = req.body.user; // social
+
+  console.log(req.body);
+
+  await verify(socialUser.txPlatform, token).then((tokenValid) => {
+
+    if (!tokenValid) {
+      return res.status(400).json({
+        ok: false,
+        msg: "No pudimos validar el token de la red social",
+        user: null
+      });
+    }
+
+    User.findOne({ tx_email: socialUser.txEmail })
       .populate('id_company')
       .then(userDB => {
 
         if (userDB) {
           // el user existe, intenta loguearse
 
-          if (userDB.bl_google === false) {
+          if (userDB.bl_social === false) {
 
             return res.status(400).json({
               ok: false,
@@ -259,15 +325,17 @@ async function loginGoogle(req: Request, res: Response) {
           // el user no existe, hay que crearlo.
 
           var user = new User();
-          user.tx_email = googleUser.email;
-          user.tx_name = googleUser.name;
+          user.tx_email = socialUser.txEmail;
+          user.tx_name = socialUser.txName;
           user.tx_password = ':)';
-          user.tx_img = googleUser.img;
-          user.bl_google = true;
+          user.tx_img = socialUser.txImage;
+          user.bl_social = true;
+          user.tx_platform = socialUser.txPlatform;
           user.tm_lastlogin = new Date();
           user.tm_createdat = new Date();
           user.id_role = 'ADMIN_ROLE';
           user.cd_pricing = 0;
+          console.log('Guardando usuario', user);
 
           user.save().then(async userSaved => {
 
@@ -311,14 +379,13 @@ async function loginGoogle(req: Request, res: Response) {
         });
 
       })
-  })
-    .catch(err => {
-      res.status(403).json({
-        ok: false,
-        msg: "Token de Google no valido",
-        err
-      });
+  }).catch(err => {
+    res.status(403).json({
+      ok: false,
+      msg: "El token no es valido",
+      err
     });
+  });
 
 
 }
@@ -326,7 +393,8 @@ async function loginGoogle(req: Request, res: Response) {
 function loginUser(req: Request, res: Response) {
 
   var body = req.body;
-  User.findOne({ tx_email: body.tx_email, bl_active: true })
+
+  User.findOne({ tx_email: body.tx_email })
     .populate('id_company')
     .then(userDB => {
 
@@ -337,6 +405,13 @@ function loginUser(req: Request, res: Response) {
         });
       }
 
+      if (userDB.bl_social) {
+        return res.status(400).json({
+          ok: false,
+          msg: "Debe ingresar con el botón de " + userDB.tx_platform
+        });
+      }
+
       if (!bcrypt.compareSync(body.tx_password, userDB.tx_password)) {
         return res.status(400).json({
           ok: false,
@@ -344,8 +419,17 @@ function loginUser(req: Request, res: Response) {
         });
       }
 
+      if (!userDB.bl_active && userDB.id_role === 'ADMIN_ROLE') {
+        return res.status(400).json({
+          ok: false,
+          msg: "El usuario no fué activado."
+        });
+      }
+
+
       // Si llego hasta acá, el user y la contraseña son correctas, creo el token
       var token = Token.getJwtToken({ user: userDB });
+
       userDB.tm_lastlogin = new Date();
 
       userDB.save().then(async () => {
@@ -371,8 +455,6 @@ function loginUser(req: Request, res: Response) {
           ok: true,
           msg: "Login post recibido.",
           token: token,
-          body: body,
-          id: userDB._id,
           user: userDB,
           menu: await obtenerMenu(userDB.id_role),
           home
@@ -460,7 +542,7 @@ function obtenerMenu(txRole: string) {
         }, {
           tx_titulo: 'Agenda',
           tx_url: '/admin/schedule',
-          tx_icon: 'mdi mdi-clock-outline'
+          tx_icon: 'mdi mdi-calendar-account'
         }, {
           tx_titulo: 'Mi Perfil',
           tx_url: '/admin/profile',
@@ -491,7 +573,7 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/waiters'
         }, {
           tx_titulo: 'Encuestas',
-          tx_icon: 'mdi mdi-poll-box',
+          tx_icon: 'mdi mdi-star',
           tx_url: '/admin/poll',
         }
       ]
@@ -588,7 +670,7 @@ export = {
   checkEmailExists,
   updateToken,
   verify,
-  loginGoogle,
+  loginSocial,
   loginUser,
   obtenerMenu
 }

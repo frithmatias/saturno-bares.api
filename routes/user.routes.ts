@@ -11,7 +11,7 @@ const userRoutes = Router();
 
 userRoutes.get('/testdata', UserController.testData);
 userRoutes.post('/updatetoken', UserController.updateToken);
-userRoutes.post('/google', UserController.loginGoogle);
+userRoutes.post('/loginsocial', UserController.loginSocial);
 userRoutes.post('/login', UserController.loginUser);
 userRoutes.post('/register', UserController.createUser);
 userRoutes.post('/activate', UserController.activateUser);

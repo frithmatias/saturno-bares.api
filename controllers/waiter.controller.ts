@@ -13,6 +13,7 @@ import { sectionSession } from '../models/section.session.model';
 function createWaiter(req: Request, res: Response) {
 
     var body = req.body;
+
     var waiter = new User({
         tx_name: body.tx_name,
         tx_email: body.tx_email,

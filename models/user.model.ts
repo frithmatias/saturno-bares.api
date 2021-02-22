@@ -14,10 +14,10 @@ const userSchema = new Schema({
     tx_password: {type: String, required: [true, 'El password es necesario']},
     id_company: {type: String, ref: 'Company', required: false},
     id_role: {type: String, required: [true, 'El rol del usuario es necesario']},
-    cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
     tx_img: {type: String, required: false},
-    bl_google: {type: Boolean, required: true, default: false},
-    bl_facebook: {type: Boolean, required: true, default: false},
+    bl_social: {type: Boolean, required: true, default: false},
+    tx_platform: {type: String, required: true, default: false},
+    cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
     tm_lastlogin: { type: Date, required: false },
     tm_createdat: { type: Date, required: false }
 },{ collection: "users" })
@@ -40,9 +40,6 @@ userSchema.method('getData', function(this: any) {
         return object;
 });
 
-
-
-
 interface User extends Document {
     bl_active: boolean;
     tx_name: string;
@@ -52,8 +49,8 @@ interface User extends Document {
     id_role: string;
     cd_pricing: number;
     tx_img: string | null;
-    bl_google: boolean;
-    bl_facebook: boolean;
+    bl_social: boolean;
+    tx_platform: string;
     tm_lastlogin: Date | null;
     tm_createdat: Date;
     getData: () => {};

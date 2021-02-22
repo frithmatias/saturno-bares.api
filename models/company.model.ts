@@ -2,7 +2,7 @@ import { Schema, model, Document } from 'mongoose';
 import uniqueValidator from 'mongoose-unique-validator';
 
 var valdTypes = {
-    values: ["bar", "resto"],
+    values: ["bar", "resto", "coffee"],
     message: "{VALUE} no es un rol permitido"
   };
 

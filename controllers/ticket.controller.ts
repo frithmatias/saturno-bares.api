@@ -380,15 +380,6 @@ async function endTicket(req: Request, res: Response) {
 // ========================================================
 
 async function readAvailability(req: Request, res: Response) {
-	// si existe una mesa con capacidad para cumplir con el requerimiento de nmPersons, entonces devuelvo 
-	// POR CADA INTERVALO un tipo de 'availability' con tables:[3,5,7] que son las mesas compatibles y disponibles 
-	// (filtro las reservadas). 
-
-	// Si NO existe una mesa que pueda cumplir con ese requerimiento devuelvo POR CADA INTERVALO TODAS las mesas disponibles 
-	// (filtro las reservadas) pero en lugar de mostrar los números de las mesas, muestro las capacidades 
-	// esto es porque me sirve para mostrar opciones y hacer un cálculo sobre la capacidad restante del sector para armar 
-	// una mesa.
-
 
 	const nmPersons = req.body.nmPersons;
 	const idSection = req.body.idSection;
@@ -434,10 +425,14 @@ async function readAvailability(req: Request, res: Response) {
 
 	if (compatibleTables.length > 0) {
 		// TICKETS WITH COMPATIBLE TABLES ASSIGNED
-		await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd }, cd_tables: { $in: compatibleTables } })
-			.then(resp => {
-				scheduledTickets = resp
-			})
+		await Ticket.find({
+			id_section: idSection,
+			tx_status: { $in: ['scheduled', 'waiting'] },
+			tm_reserve: { $gte: dayStart, $lt: dayEnd },
+			cd_tables: { $in: compatibleTables }
+		}).then(resp => {
+			scheduledTickets = resp
+		})
 			.catch(() => {
 				return res.status(500).json({
 					ok: false,
@@ -463,12 +458,17 @@ async function readAvailability(req: Request, res: Response) {
 	}
 
 	// FILTER BUSY TABLES BY INTERVAL
+
+	let interval = dayStart.getUTCHours() - 1; //UTC 24 INTERVALS 
 	for (let hr of intervals) {
+		interval++;
+		if (interval > 23) { interval = 0 } // [3,4,5....23,0,1,2]
+
 		// SI HAY MESAS COMPATIBLES MIS MESAS DISPONIBLES SON LAS MESAS COMPATIBLES, SINO SINO TODAS LAS MESAS
 		let availableTables: number[] = compatibleTables.length > 0 ? compatibleTables : sectionTables;
 
-		// TICKETS PARA ESE INTERVALO		
-		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getHours() === hr);
+		// TICKETS PARA ESE INTERVALO	
+		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getUTCHours() === interval);
 
 		// FILTRO LAS MESAS RESERVADAS
 		for (let ticket of scheduledTicketsInterval) { // for each scheduled ticket
@@ -481,7 +481,7 @@ async function readAvailability(req: Request, res: Response) {
 
 
 		if (compatibleTables.length > 0) {
-			availability.push({ interval: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hr), tables: availableTables, capacity: 0 })
+			availability.push({ interval: new Date(dayStart.getTime() + (hr * 1000 * 60 * 60)), tables: availableTables, capacity: 0 })
 		} else {
 
 			// array de mesas disponibles
@@ -503,7 +503,8 @@ async function readAvailability(req: Request, res: Response) {
 			// la capacidad total de las mesas libres (blReserved === false)
 			let capacity: number = 0;
 			if (arrcapacity.length > 0) { capacity = arrcapacity.reduce((a, b) => a + b) - (arrcapacity.length * 2) + 2; }
-			availability.push({ interval: new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), hr), tables: newTables, capacity })
+			availability.push({ interval: new Date(dayStart.getTime() + (hr * 1000 * 60 * 60)), tables: newTables, capacity })
+
 		}
 
 	}
@@ -628,7 +629,7 @@ function createTicket(req: Request, res: Response) {
 			bl_priority: false,
 			tx_name: txName,
 			tx_platform: null,
-			tx_email: txEmail, 
+			tx_email: txEmail,
 			nm_phone: nmPhone,
 			tx_call: null,
 			tx_status: txStatus,
@@ -653,7 +654,7 @@ function createTicket(req: Request, res: Response) {
 			if (txStatus === 'queued') {
 				// si spm esta activado hago un push 
 				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
-				
+
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
 				return res.status(201).json({
@@ -733,7 +734,7 @@ async function validateTicket(req: Request, res: Response) {
 	}
 
 	if (txPlatform === 'google') {
-		await user.verify(txToken).then((googleUser: any) => {
+		await user.verify(txPlatform, txToken).then((googleUser: any) => {
 			txEmail = googleUser.email;
 			txName = googleUser.name;
 			txImage = googleUser.img;
