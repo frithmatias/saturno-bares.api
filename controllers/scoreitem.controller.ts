@@ -39,7 +39,7 @@ let readScoreItems = (req: Request, res: Response) => {
             if (!sectionsDB || sectionsDB.length === 0) {
                 return res.status(200).json({
                     ok: false,
-                    msg: 'No existen sectores para la empresa solicitada',
+                    msg: 'No existen encuestas para la empresa seleccionada',
                     scoreitems: []
                 })
             }
@@ -57,19 +57,19 @@ let readScoreItems = (req: Request, res: Response) => {
                     if (!scoreitemsDB) {
                         return res.status(200).json({
                             ok: false,
-                            msg: 'No existen items a calificar para la empresa seleccionada',
+                            msg: 'No existen encuestas para la empresa seleccionada',
                             scoreitems: []
                         })
                     }
                     return res.status(200).json({
                         ok: true,
-                        msg: 'Items a calificar obtenidos correctamente',
+                        msg: 'Encuestas obtenidos correctamente',
                         scoreitems: scoreitemsDB
                     })
                 }).catch(() => {
                     return res.status(500).json({
                         ok: false,
-                        msg: 'Error al consultar los items a calificar para los sectores de la empresa.',
+                        msg: 'Error al consultar las encuestas para los sectores de la empresa.',
                         scoreitems: null
                     })
 
@@ -89,13 +89,13 @@ let deleteScoreItem = (req: Request, res: Response) => {
     ScoreItem.findByIdAndDelete(idScoreItem).then((scoreitemDeleted) => {
         res.status(200).json({
             ok: true,
-            msg: 'Item a calificar eliminado correctamente',
+            msg: 'Encuesta eliminada correctamente',
             scoreitem: scoreitemDeleted
         })
     }).catch(() => {
         res.status(400).json({
             ok: false,
-            msg: 'Error al eliminar el item a calificar',
+            msg: 'Error al eliminar la encuesta',
             scoreitem: null
         })
     })

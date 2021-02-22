@@ -25,12 +25,12 @@ var valdTypes = {
     tx_address_number: { type: Number, required: [true, 'El tx_address_number es necesario'] },
 
     // about form
-    tx_email: { type: String, required: false },
-    tx_telegram: { type: String, required: false },
-    tx_whatsapp: { type: String, required: false },
-    tx_facebook: { type: String, required: false },
-    tx_twitter: { type: String, required: false },
-    tx_instagram: { type: String, required: false },
+    tx_email: { type: String, default: '' },
+    tx_telegram: { type: String, default: '' },
+    tx_whatsapp: { type: String, default: '' },
+    tx_facebook: { type: String, default: '' },
+    tx_twitter: { type: String, default: '' },
+    tx_instagram: { type: String, default: '' },
     tx_company_welcome: { type: String, default: '' },
 
     // uploader

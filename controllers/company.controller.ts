@@ -4,6 +4,9 @@ import { User } from '../models/user.model';
 import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { Settings } from '../models/settings.model';
+import { ScoreItem } from '../models/scoreitem.model';
+import { pipe } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 // ========================================================
 // Company Methods
@@ -239,27 +242,35 @@ function deleteCompany(req: Request, res: Response) {
 
   var idCompany = req.params.idCompany;
 
-  let users = User.deleteMany({ id_company: idCompany, id_role: 'ASSISTANT_ROLE' }).then(usersDeleted => usersDeleted)
-  let tables = Table.deleteMany({ id_company: idCompany }).then(tablesDeleted => tablesDeleted)
-  let sections = Section.deleteMany({ id_company: idCompany }).then(sectionsDeleted => sectionsDeleted)
-  let company = Company.findByIdAndDelete(idCompany).then(companyDeleted => companyDeleted)
+  const sectionsIds = Section.find({ id_company: idCompany }).then(sectionsDB => {
 
-  Promise.all([users, tables, sections, company]).then(resp => {
-    return res.status(200).json({
-      ok: true,
-      msg: 'La empresa y sus vínculos fueron eliminados correctamente',
-      company: {
-        company: resp[2],
-        childs: { users: resp[0], tables: resp[1] }
-      }
+    const sections = sectionsDB.map(section => String(section._id));
+
+    const scoreItemsDeleted = ScoreItem.deleteMany({ id_section: { $in: sections } })
+    const tablesDeleted = Table.deleteMany({ id_section: { $in: sections } })
+    const sectionsDeleted = Section.deleteMany({ id_company: idCompany })
+    const waitersDeleted = User.deleteMany({ id_company: idCompany, id_role: 'WAITER_ROLE' })
+    const companyDeleted = Company.findByIdAndDelete(idCompany)
+
+    Promise.all([scoreItemsDeleted, tablesDeleted, sectionsDeleted, waitersDeleted, companyDeleted]).then(resp => {
+      return res.status(200).json({
+        ok: true,
+        msg: 'La empresa y sus vínculos fueron eliminados correctamente',
+        company: {
+          company: resp[2],
+          childs: { users: resp[0], tables: resp[1] }
+        }
+      });
+    }).catch((err) => {
+      return res.status(400).json({
+        ok: false,
+        msg: { msg: 'Error al eliminar la empresa o uno de sus vínculos', detail: err },
+        company: null
+      });
     });
-  }).catch((err) => {
-    return res.status(400).json({
-      ok: false,
-      msg: { msg: 'Error al eliminar la empresa o uno de sus vínculos', detail: err },
-      company: null
-    });
+
   });
+
 }
 
 function checkCompanyExists(req: Request, res: Response) {

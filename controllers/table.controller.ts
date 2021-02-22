@@ -48,7 +48,7 @@ let readTables = (req: Request, res: Response) => {
             if (!sectionsDB || sectionsDB.length === 0) {
                 return res.status(200).json({
                     ok: false,
-                    msg: 'No existen sectores para la empresa solicitada',
+                    msg: 'No se obtuvieron mesas porque no existen sectores',
                     tables: []
                 })
             }
