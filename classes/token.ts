@@ -7,7 +7,7 @@ export default class Token {
 
     static getJwtToken(payload: any): string {
         return jwt.sign(
-            { usuario: payload },
+            { payload },
             environment.TOKEN_SEED,
             { expiresIn: environment.TOKEN_TIMEOUT }
         );

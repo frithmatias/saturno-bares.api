@@ -37,7 +37,7 @@ export default class Spm {
     private constructor() { }
 
     // a partir de un ticket 'queued' busca mesa 'idle' si encuentra la pasa a spmProvide
-    // este método queda sin efecto en modo MANUAL (bl_spm_auto=false)
+    // este método queda sin efecto en modo MANUAL (bl_spm=false)
     public static push = (ticket: Ticket): Promise<string> => {
 
         return new Promise((resolve, reject) => {
@@ -126,7 +126,7 @@ export default class Spm {
                     // obtengo las configuraciones para el comercio
                     const settings = await Settings.findOne({ id_company: ticketsDB[0].id_company });
 
-                    if (settings?.bl_spm_auto) {
+                    if (settings?.bl_spm) {
                         // AUTO ON
                         // 2A.
                         if (!ticketToProvide) {

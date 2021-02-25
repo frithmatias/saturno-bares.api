@@ -166,86 +166,77 @@ function updateToken(req: any, res: Response) {
   });
 }
 
-async function verify(platform: string, token: string) {
+async function verify(platform: string, token: string): Promise<void> {
 
-  // GOOGLE TOKEN VERIFY
-  if (platform === 'google') {
-    let response = new Promise(async resolve => {
+  return new Promise(async (resolve, reject) => {
+    // GOOGLE TOKEN VERIFY
+    if (platform === 'google') {
       const credentials = await oauthClient.verifyIdToken({
         idToken: token,
         audience: GOOGLE_CLIENT_ID
       });
-      // const payload = credentials.getPayload();
-      // return {
-      //   name: payload.name,
-      //   email: payload.email,
-      //   img: payload.picture
-      // };
-      resolve(true);
-    })
-    return response;
-  }
+      const payload = credentials.getPayload();
+      if( payload.email_verified && payload.exp * 1000 > + new Date()) {
+        return resolve();
+      } else {
+        return reject();
+      }
+    }
 
-  // FACEBOOK TOKEN VERIFY
-  if (platform === 'facebook') {
-    const app_id = environment.FB_APP_ID;
-    const app_secret = environment.FB_APP_SECRET;
-    const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
+    // FACEBOOK TOKEN VERIFY
+    if (platform === 'facebook') {
+      const app_id = environment.FB_APP_ID;
+      const app_secret = environment.FB_APP_SECRET;
+      const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
 
-    // get app_token
-    let access_token: string = await new Promise((resolve, reject) => {
+      // get app_token
+      let access_token: string = await new Promise((resolve, reject) => {
 
-      https.get(access_token_url, (response: any) => {
-        var body = '';
-        response.on('data', function (chunk: any) {
-          body += chunk;
+        https.get(access_token_url, (response: any) => {
+          var body = '';
+          response.on('data', function (chunk: any) {
+            body += chunk;
+          });
+          response.on('end', function () {
+            var fbResponse = JSON.parse(body);
+            resolve(fbResponse.access_token);
+          });
         });
-        response.on('end', function () {
-          var fbResponse = JSON.parse(body);
-          resolve(fbResponse.access_token);
+
+      })
+
+      // app_token and user_token validation
+      const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
+      let output: facebookBackendResponse = await new Promise((resolve, reject) => {
+        https.get(valid_token, (response: any) => {
+          var body = '';
+          response.on('data', function (chunk: any) {
+            body += chunk;
+          });
+          response.on('end', function () {
+            var fbResponse = JSON.parse(body);
+            resolve(fbResponse);
+          });
         });
-      });
+      })
 
-    })
+      if (output.data.is_valid) {
+        return resolve();
+      } else {
+        return reject();
+      }
 
-    // app_token and user_token validation
-    const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
-    let output: facebookBackendResponse = await new Promise((resolve, reject) => {
-      https.get(valid_token, (response: any) => {
-        var body = '';
-        response.on('data', function (chunk: any) {
-          body += chunk;
-        });
-        response.on('end', function () {
-          var fbResponse = JSON.parse(body);
-          resolve(fbResponse);
-        });
-      });
-    })
+    }
+  })
 
-    return output.data.is_valid ? true : false;
-
-  }
 }
-
-
 
 async function loginSocial(req: Request, res: Response) {
 
   const token = req.body.token;
   const socialUser: Social = req.body.user; // social
 
-  console.log(req.body);
-
-  await verify(socialUser.txPlatform, token).then((tokenValid) => {
-
-    if (!tokenValid) {
-      return res.status(400).json({
-        ok: false,
-        msg: "No pudimos validar el token de la red social",
-        user: null
-      });
-    }
+  await verify(socialUser.txPlatform, token).then(() => {
 
     User.findOne({ tx_email: socialUser.txEmail })
       .populate('id_company')
@@ -265,7 +256,14 @@ async function loginSocial(req: Request, res: Response) {
           } else {
 
             // Google SignIn -> new token
-            var token = Token.getJwtToken({ user: userDB });
+
+            // rompo la referencia con assign() y uso toObject() para usar extraer del objeto
+            // la data que está en userDB._doc con un getter
+            let newUser: any = Object.assign({}, userDB.toObject());
+            // Le quito tx_company_welcome para evitar problemas con caracteres de 2 bytes 
+            // al decodificar con atob() en el frontend
+            newUser.id_company = 'eliminado solo para el token';
+            var token = Token.getJwtToken({ newUser });
 
             userDB.updateOne({ tm_lastlogin: + new Date().getTime() })
               .then(async userSaved => {
@@ -335,7 +333,6 @@ async function loginSocial(req: Request, res: Response) {
           user.tm_createdat = new Date();
           user.id_role = 'ADMIN_ROLE';
           user.cd_pricing = 0;
-          console.log('Guardando usuario', user);
 
           user.save().then(async userSaved => {
 
@@ -428,7 +425,14 @@ function loginUser(req: Request, res: Response) {
 
 
       // Si llego hasta acá, el user y la contraseña son correctas, creo el token
-      var token = Token.getJwtToken({ user: userDB });
+
+      // rompo la referencia con assign() y uso toObject() para usar extraer del objeto
+      // la data que está en userDB._doc con un getter
+      let newUser: any = Object.assign({}, userDB.toObject());
+      // Le quito tx_company_welcome para evitar problemas con caracteres de 2 bytes 
+      // al decodificar con atob() en el frontend
+      newUser.id_company = 'eliminado solo para el token';
+      var token = Token.getJwtToken({ newUser });
 
       userDB.tm_lastlogin = new Date();
 

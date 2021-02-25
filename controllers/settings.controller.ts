@@ -21,10 +21,11 @@ function readSettings(req: Request, res: Response) {
 
 function updateSettings(req: Request, res: Response) {
 
-    let idCompany = req.body._id;
-    let blSpmAuto = req.body.bl_spm_auto;
-
-    Settings.findByIdAndUpdate(idCompany, { bl_spm_auto: blSpmAuto }, {new: true}).then(settingsUpdated => {
+    const idCompany = req.body._id;
+    const blSpm = req.body.bl_spm;
+    const blSchedule = req.body.bl_schedule;
+    const blQueue = req.body.bl_queue;
+    Settings.findByIdAndUpdate(idCompany, { bl_spm: blSpm, bl_schedule: blSchedule, bl_queue: blQueue }, {new: true}).then(settingsUpdated => {
         return res.status(200).json({
             ok: true,
             msg: 'Ajustes guardados correctamente',

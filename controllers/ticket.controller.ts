@@ -653,7 +653,7 @@ function createTicket(req: Request, res: Response) {
 
 			if (txStatus === 'queued') {
 				// si spm esta activado hago un push 
-				let spmResp: string = settings?.bl_spm_auto ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
+				let spmResp: string = settings?.bl_spm ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
 
 				server.io.to(sectionDB.id_company).emit('update-waiters');
 
@@ -708,14 +708,12 @@ function createTicket(req: Request, res: Response) {
 
 async function validateTicket(req: Request, res: Response) {
 	// WAITING -> TERMINATED || PENDING || SCHEDULED
-
 	const idTicket = req.body.idTicket;
 	const txPlatform = req.body.txPlatform;
 	const txToken = req.body.txToken || null;
-	// those vars are not const cause from Google will receive a token to validate
-	let txEmail = req.body.txEmail || null;
-	let txImage = req.body.txImage || null;
-	let txName = req.body.txName || null;
+	const txEmail = req.body.txEmail || null;
+	const txImage = req.body.txImage || null;
+	const txName = req.body.txName || null;
 
 	if (!txPlatform || !txEmail) {
 		if (txPlatform) {
@@ -733,13 +731,14 @@ async function validateTicket(req: Request, res: Response) {
 		}
 	}
 
-	if (txPlatform === 'google') {
-		await user.verify(txPlatform, txToken).then((googleUser: any) => {
-			txEmail = googleUser.email;
-			txName = googleUser.name;
-			txImage = googleUser.img;
+
+	await user.verify(txPlatform, txToken).catch(() => {
+		return res.status(400).json({
+			ok: false,
+			msg: `El Token de Google no es válido.`,
+			ticket: null
 		})
-	}
+	})
 
 	const server = Server.instance; // singleton
 
