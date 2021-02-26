@@ -19,8 +19,7 @@ function registerUser(req: any, res: Response) {
   // register admins and customers
   
     var body = req.body;
-    console.log(req.body)
-  
+ 
     const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
     var user = new User({
       bl_active: false,
@@ -117,6 +116,7 @@ async function loginSocial(req: Request, res: Response) {
 // login admins social (if not exist then create it)
 
   const token = req.body.token;
+  const isAdmin = req.body.isAdmin;
   const socialUser: Social = req.body.user; // social
 
   await verify(socialUser.txPlatform, token).then(() => {
@@ -127,12 +127,11 @@ async function loginSocial(req: Request, res: Response) {
 
         if (userDB) {
           // el user existe, intenta loguearse
-
           if (userDB.bl_social === false) {
 
             return res.status(400).json({
               ok: false,
-              msg: "Para el email ingresado debe usar autenticación con clave.",
+              msg: `Para ${userDB.tx_email} tenes que usar login con clave`,
               user: null
             });
 
@@ -160,8 +159,8 @@ async function loginSocial(req: Request, res: Response) {
                     case 'ADMIN_ROLE':
                       home = '/admin/home';
                       break;
-                    case 'SUPERUSER_ROLE':
-                      home = '/superuser/home';
+                    case 'CUSTOMER_ROLE':
+                      home = '/public/tickets';
                       break;
                     default:
                       home = '/admin/role';
@@ -214,7 +213,7 @@ async function loginSocial(req: Request, res: Response) {
           user.tx_platform = socialUser.txPlatform;
           user.tm_lastlogin = new Date();
           user.tm_createdat = new Date();
-          user.id_role = 'ADMIN_ROLE';
+          user.id_role = isAdmin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
           user.cd_pricing = 0;
 
           user.save().then(async userSaved => {
@@ -289,7 +288,7 @@ function loginUser(req: Request, res: Response) {
       if (userDB.bl_social) {
         return res.status(400).json({
           ok: false,
-          msg: "Debe ingresar con el botón de " + userDB.tx_platform
+          msg: "Para esa cuenta ingrese con el botón de " + userDB.tx_platform
         });
       }
 
@@ -497,8 +496,6 @@ async function verify(platform: string, token: string): Promise<void> {
   })
 
 }
-
-
 
 function obtenerMenu(txRole: string) {
 

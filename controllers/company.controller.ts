@@ -218,21 +218,21 @@ function updateWebPage(req: Request, res: Response) {
     if (!companyUpdated) {
       return res.status(400).json({
         ok: false,
-        msg: 'Error al actualizar datos secundarios del comercio',
+        msg: 'Error al actualizar la información del comercio',
         company: null
       })
     }
 
     return res.status(200).json({
       ok: true,
-      msg: 'Datos secundarios del comercio actualizados correctamente',
+      msg: 'Información del comercio actualizada correctamente',
       company: companyUpdated
     })
 
   }).catch((err) => {
     return res.status(400).json({
       ok: false,
-      msg: { msg: 'Error al actualizar datos secundarios del comercio', detail: err },
+      msg: { msg: 'Error al actualizar la información del comercio', detail: err },
       company: null
     })
   })

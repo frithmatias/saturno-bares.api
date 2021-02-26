@@ -560,7 +560,7 @@ function createTicket(req: Request, res: Response) {
 	// ADMIN(SCHEDULE) -> SCHEDULED 
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	const { blContingent, idSocket, nmPersons, idSection, tmReserve, cdTables, txEmail, nmPhone } = req.body;
+	const { txName, nmPersons, idSection, tmReserve, cdTables, blContingent, idSocket, txEmail, nmPhone } = req.body;
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
@@ -627,7 +627,7 @@ function createTicket(req: Request, res: Response) {
 			nm_persons: nmPersons,
 			bl_contingent: blContingent,
 			bl_priority: false,
-			tx_name: null, // set when customer validate the ticket
+			tx_name: txName, 
 			tx_platform: null,
 			tx_email: txEmail,
 			nm_phone: nmPhone,
@@ -712,7 +712,6 @@ async function validateTicket(req: Request, res: Response) {
 	const txPlatform = req.body.txPlatform;
 	const txToken = req.body.txToken || null;
 	const txEmail = req.body.txEmail || null;
-	const txName = req.body.txName || null;
 
 	if (!txPlatform || !txEmail) {
 		if (txPlatform) {
@@ -828,7 +827,6 @@ async function validateTicket(req: Request, res: Response) {
 			ticketWaiting.tx_platform = txPlatform;
 			ticketWaiting.tx_email = txEmail;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
-			ticketWaiting.tx_name = txName;
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
 
@@ -845,7 +843,7 @@ async function validateTicket(req: Request, res: Response) {
 
 				if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve) {
 					const messageToUser = `
-Hola ${txName}, la reserva de ${cdTablesStr} ${cdTables} en ${txCompanyName} quedó confirmada.
+Hola ${ticketWaiting.tx_name}, la reserva de ${cdTablesStr} ${cdTables} en ${txCompanyName} quedó confirmada.
 
 Te esperamos en ${tmRemaining} en ${txCompanyAddress}.
 
