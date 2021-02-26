@@ -560,7 +560,7 @@ function createTicket(req: Request, res: Response) {
 	// ADMIN(SCHEDULE) -> SCHEDULED 
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	const { blContingent, idSocket, txName, nmPersons, idSection, tmReserve, cdTables, txEmail, nmPhone } = req.body;
+	const { blContingent, idSocket, nmPersons, idSection, tmReserve, cdTables, txEmail, nmPhone } = req.body;
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
@@ -627,7 +627,7 @@ function createTicket(req: Request, res: Response) {
 			nm_persons: nmPersons,
 			bl_contingent: blContingent,
 			bl_priority: false,
-			tx_name: txName,
+			tx_name: null, // set when customer validate the ticket
 			tx_platform: null,
 			tx_email: txEmail,
 			nm_phone: nmPhone,
@@ -712,7 +712,6 @@ async function validateTicket(req: Request, res: Response) {
 	const txPlatform = req.body.txPlatform;
 	const txToken = req.body.txToken || null;
 	const txEmail = req.body.txEmail || null;
-	const txImage = req.body.txImage || null;
 	const txName = req.body.txName || null;
 
 	if (!txPlatform || !txEmail) {
@@ -731,14 +730,16 @@ async function validateTicket(req: Request, res: Response) {
 		}
 	}
 
-
-	await user.verify(txPlatform, txToken).catch(() => {
-		return res.status(400).json({
-			ok: false,
-			msg: `El Token de Google no es válido.`,
-			ticket: null
+	// txPlatform === 'email' no need validation
+	if(txPlatform === 'google' || txPlatform === 'facebook'){
+		await user.verify(txPlatform, txToken).catch(() => {
+			return res.status(400).json({
+				ok: false,
+				msg: `El Token de Google no es válido.`,
+				ticket: null
+			})
 		})
-	})
+	}
 
 	const server = Server.instance; // singleton
 
@@ -827,7 +828,7 @@ async function validateTicket(req: Request, res: Response) {
 			ticketWaiting.tx_platform = txPlatform;
 			ticketWaiting.tx_email = txEmail;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
-
+			ticketWaiting.tx_name = txName;
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
 

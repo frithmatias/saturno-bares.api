@@ -16,7 +16,7 @@ const userSchema = new Schema({
     id_role: {type: String, required: [true, 'El rol del usuario es necesario']},
     tx_img: {type: String, required: false},
     bl_social: {type: Boolean, required: true, default: false},
-    tx_platform: {type: String, required: true, default: false},
+    tx_platform: {type: String, required: true, default: 'unknown'},
     cd_pricing: {type: Number, ref: 'Pricing' , required: false, default: 0},
     tm_lastlogin: { type: Date, required: false },
     tm_createdat: { type: Date, required: false }

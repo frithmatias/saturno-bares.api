@@ -15,6 +15,63 @@ const GOOGLE_CLIENT_ID = environment.GOOGLE_CLIENT_ID;
 const { OAuth2Client } = require("google-auth-library");
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+function registerUser(req: any, res: Response) {
+  // register admins and customers
+  
+    var body = req.body;
+    console.log(req.body)
+  
+    const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
+    var user = new User({
+      bl_active: false,
+      tx_name: body.user.tx_name,
+      tx_email: body.user.tx_email,
+      tx_password: bcrypt.hashSync(body.user.tx_password, 10),
+      bl_social: false,
+      tx_platform: 'email',
+      tm_lastlogin: null,
+      tm_createdat: new Date(),
+      id_role: id_role,
+    });
+  
+    user.save().then((userSaved) => {
+  
+      let hash = bcrypt.hashSync(String(userSaved._id), 10);
+      hash = hash.replace(/\//gi, '_slash_')
+      hash = hash.replace(/\./gi, '_dot_')
+      const confirmEmailMessage = `
+  Hola ${userSaved.tx_name}, gracias por registrarte en Saturno. 
+  
+  Para activar tu cuenta por favor hace click aquí:
+  
+  https://saturno.fun/activate/${userSaved.tx_email}/${hash}`;
+  
+  
+  
+      Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
+        console.log('mail ok', resp);
+      }).catch(err => {
+        console.log('fallo', err)
+      })
+  
+      res.status(201).json({
+        ok: true,
+        msg: "Usuario guardado correctamente.",
+        user: userSaved
+      });
+  
+    }).catch((err) => {
+      return res.status(400).json({
+        ok: false,
+        msg: "Error al guardar el usuario.",
+        errors: err
+      });
+  
+    });
+  
+  
+  }
+  
 function activateUser(req: Request, res: Response) {
   // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
 
@@ -56,182 +113,8 @@ function activateUser(req: Request, res: Response) {
 
 }
 
-function createUser(req: any, res: Response) {
-
-  var body = req.body;
-  var user = new User({
-    bl_active: false,
-    tx_name: body.user.tx_name,
-    tx_email: body.user.tx_email,
-    tx_password: bcrypt.hashSync(body.user.tx_password, 10),
-    bl_social: false,
-    tm_lastlogin: null,
-    tm_createdat: new Date(),
-    id_role: 'ADMIN_ROLE',
-  });
-
-  user.save().then((userSaved) => {
-
-    let hash = bcrypt.hashSync(String(userSaved._id), 10);
-    hash = hash.replace(/\//gi, '_slash_')
-    hash = hash.replace(/\./gi, '_dot_')
-    const confirmEmailMessage = `
-Hola ${userSaved.tx_name}, gracias por registrarte en Saturno. 
-
-Para activar tu cuenta por favor hace click aquí:
-
-https://saturno.fun/activate/${userSaved.tx_email}/${hash}`;
-
-
-
-    Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
-      console.log('mail ok', resp);
-    }).catch(err => {
-      console.log('fallo', err)
-    })
-
-    res.status(201).json({
-      ok: true,
-      msg: "Usuario guardado correctamente.",
-      user: userSaved
-    });
-
-  }).catch((err) => {
-    return res.status(400).json({
-      ok: false,
-      msg: "Error al guardar el usuario.",
-      errors: err
-    });
-
-  });
-
-
-}
-
-function attachCompany(req: Request, res: Response) {
-
-  let company = req.body.company;
-  let idUser = req.params.idUser;
-
-  User.findByIdAndUpdate(idUser, { 'id_company': company._id }, { new: true })
-    .populate('id_company')
-    .then(userUpdated => {
-
-      return res.status(200).json({
-        ok: true,
-        msg: 'La empresa se asigno al user correctamente',
-        user: userUpdated
-      })
-    }).catch(() => {
-      return res.status(500).json({
-        ok: true,
-        msg: 'No se pudo asignar la empresa al user',
-        user: null
-      })
-    })
-
-}
-
-function checkEmailExists(req: Request, res: Response) {
-
-  let pattern = req.body.pattern;
-  User.findOne({ tx_email: pattern }).then(userDB => {
-    if (!userDB) {
-      return res.status(200).json({
-        ok: true,
-        msg: 'No existe el email'
-      })
-    }
-    return res.status(200).json({
-      ok: false,
-      msg: 'El email ya existe.'
-    })
-  }).catch(() => {
-    return res.status(500).json({
-      ok: false,
-      msg: 'Error al consultar si existe el email'
-    })
-  })
-
-}
-
-function updateToken(req: any, res: Response) {
-
-  let body = req.body;
-  var token = Token.getJwtToken({ user: body.user })
-  res.status(200).json({
-    ok: true,
-    user: req.user,
-    newtoken: token
-  });
-}
-
-async function verify(platform: string, token: string): Promise<void> {
-
-  return new Promise(async (resolve, reject) => {
-    // GOOGLE TOKEN VERIFY
-    if (platform === 'google') {
-      const credentials = await oauthClient.verifyIdToken({
-        idToken: token,
-        audience: GOOGLE_CLIENT_ID
-      });
-      const payload = credentials.getPayload();
-      if( payload.email_verified && payload.exp * 1000 > + new Date()) {
-        return resolve();
-      } else {
-        return reject();
-      }
-    }
-
-    // FACEBOOK TOKEN VERIFY
-    if (platform === 'facebook') {
-      const app_id = environment.FB_APP_ID;
-      const app_secret = environment.FB_APP_SECRET;
-      const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
-
-      // get app_token
-      let access_token: string = await new Promise((resolve, reject) => {
-
-        https.get(access_token_url, (response: any) => {
-          var body = '';
-          response.on('data', function (chunk: any) {
-            body += chunk;
-          });
-          response.on('end', function () {
-            var fbResponse = JSON.parse(body);
-            resolve(fbResponse.access_token);
-          });
-        });
-
-      })
-
-      // app_token and user_token validation
-      const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
-      let output: facebookBackendResponse = await new Promise((resolve, reject) => {
-        https.get(valid_token, (response: any) => {
-          var body = '';
-          response.on('data', function (chunk: any) {
-            body += chunk;
-          });
-          response.on('end', function () {
-            var fbResponse = JSON.parse(body);
-            resolve(fbResponse);
-          });
-        });
-      })
-
-      if (output.data.is_valid) {
-        return resolve();
-      } else {
-        return reject();
-      }
-
-    }
-  })
-
-}
-
 async function loginSocial(req: Request, res: Response) {
+// login admins social (if not exist then create it)
 
   const token = req.body.token;
   const socialUser: Social = req.body.user; // social
@@ -388,6 +271,7 @@ async function loginSocial(req: Request, res: Response) {
 }
 
 function loginUser(req: Request, res: Response) {
+// login admins and customers with email
 
   var body = req.body;
 
@@ -416,7 +300,7 @@ function loginUser(req: Request, res: Response) {
         });
       }
 
-      if (!userDB.bl_active && userDB.id_role === 'ADMIN_ROLE') {
+      if (!userDB.bl_active && (userDB.id_role === 'ADMIN_ROLE' || userDB.id_role === 'CUSTOMER_ROLE')) {
         return res.status(400).json({
           ok: false,
           msg: "El usuario no fué activado."
@@ -448,16 +332,23 @@ function loginUser(req: Request, res: Response) {
           case 'ADMIN_ROLE':
             home = '/admin/home';
             break;
-          case 'SUPERUSER_ROLE':
-            home = '/superuser/home';
+          case 'CUSTOMER_ROLE':
+            home = '/public/tickets';
             break;
-          default:
-            home = '/waiter/role';
         };
 
+        if(userDB.id_role === 'CUSTOMER_ROLE'){
+          return res.status(200).json({
+            ok: true,
+            msg: "Cliente logueado correctamente",
+            user: userDB,
+            home
+          });
+        }
+        
         res.status(200).json({
           ok: true,
-          msg: "Login post recibido.",
+          msg: "Usuario logueado correctamente",
           token: token,
           user: userDB,
           menu: await obtenerMenu(userDB.id_role),
@@ -483,6 +374,131 @@ function loginUser(req: Request, res: Response) {
 
 
 }
+
+function attachCompany(req: Request, res: Response) {
+
+  let company = req.body.company;
+  let idUser = req.params.idUser;
+
+  User.findByIdAndUpdate(idUser, { 'id_company': company._id }, { new: true })
+    .populate('id_company')
+    .then(userUpdated => {
+
+      return res.status(200).json({
+        ok: true,
+        msg: 'La empresa se asigno al user correctamente',
+        user: userUpdated
+      })
+    }).catch(() => {
+      return res.status(500).json({
+        ok: true,
+        msg: 'No se pudo asignar la empresa al user',
+        user: null
+      })
+    })
+
+}
+
+function checkEmailExists(req: Request, res: Response) {
+
+  let pattern = req.body.pattern;
+  User.findOne({ tx_email: pattern }).then(userDB => {
+    if (!userDB) {
+      return res.status(200).json({
+        ok: true,
+        msg: 'No existe el email'
+      })
+    }
+    return res.status(200).json({
+      ok: false,
+      msg: 'El email ya existe.'
+    })
+  }).catch(() => {
+    return res.status(500).json({
+      ok: false,
+      msg: 'Error al consultar si existe el email'
+    })
+  })
+
+}
+
+function updateToken(req: any, res: Response) {
+
+  let body = req.body;
+  var token = Token.getJwtToken({ user: body.user })
+  res.status(200).json({
+    ok: true,
+    user: req.user,
+    newtoken: token
+  });
+}
+
+async function verify(platform: string, token: string): Promise<void> {
+
+  return new Promise(async (resolve, reject) => {
+    // GOOGLE TOKEN VERIFY
+    if (platform === 'google') {
+      const credentials = await oauthClient.verifyIdToken({
+        idToken: token,
+        audience: GOOGLE_CLIENT_ID
+      });
+      const payload = credentials.getPayload();
+      if( payload.email_verified && payload.exp * 1000 > + new Date()) {
+        return resolve();
+      } else {
+        return reject();
+      }
+    }
+
+    // FACEBOOK TOKEN VERIFY
+    if (platform === 'facebook') {
+      const app_id = environment.FB_APP_ID;
+      const app_secret = environment.FB_APP_SECRET;
+      const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
+
+      // get app_token
+      let access_token: string = await new Promise((resolve, reject) => {
+
+        https.get(access_token_url, (response: any) => {
+          var body = '';
+          response.on('data', function (chunk: any) {
+            body += chunk;
+          });
+          response.on('end', function () {
+            var fbResponse = JSON.parse(body);
+            resolve(fbResponse.access_token);
+          });
+        });
+
+      })
+
+      // app_token and user_token validation
+      const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
+      let output: facebookBackendResponse = await new Promise((resolve, reject) => {
+        https.get(valid_token, (response: any) => {
+          var body = '';
+          response.on('data', function (chunk: any) {
+            body += chunk;
+          });
+          response.on('end', function () {
+            var fbResponse = JSON.parse(body);
+            resolve(fbResponse);
+          });
+        });
+      })
+
+      if (output.data.is_valid) {
+        return resolve();
+      } else {
+        return reject();
+      }
+
+    }
+  })
+
+}
+
+
 
 function obtenerMenu(txRole: string) {
 
@@ -669,7 +685,7 @@ function testData(req: Request, res: Response) {
 export = {
   activateUser,
   testData,
-  createUser,
+  registerUser,
   attachCompany,
   checkEmailExists,
   updateToken,
