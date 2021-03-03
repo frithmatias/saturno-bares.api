@@ -17,60 +17,60 @@ const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function registerUser(req: any, res: Response) {
   // register admins and customers
-  
-    var body = req.body;
- 
-    const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
-    var user = new User({
-      bl_active: false,
-      tx_name: body.user.tx_name,
-      tx_email: body.user.tx_email,
-      tx_password: bcrypt.hashSync(body.user.tx_password, 10),
-      bl_social: false,
-      tx_platform: 'email',
-      tm_lastlogin: null,
-      tm_createdat: new Date(),
-      id_role: id_role,
-    });
-  
-    user.save().then((userSaved) => {
-  
-      let hash = bcrypt.hashSync(String(userSaved._id), 10);
-      hash = hash.replace(/\//gi, '_slash_')
-      hash = hash.replace(/\./gi, '_dot_')
-      const confirmEmailMessage = `
+
+  var body = req.body;
+
+  const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
+  var user = new User({
+    bl_active: false,
+    tx_name: body.user.tx_name,
+    tx_email: body.user.tx_email,
+    tx_password: bcrypt.hashSync(body.user.tx_password, 10),
+    bl_social: false,
+    tx_platform: 'email',
+    tm_lastlogin: null,
+    tm_createdat: new Date(),
+    id_role: id_role,
+  });
+
+  user.save().then((userSaved) => {
+
+    let hash = bcrypt.hashSync(String(userSaved._id), 10);
+    hash = hash.replace(/\//gi, '_slash_')
+    hash = hash.replace(/\./gi, '_dot_')
+    const confirmEmailMessage = `
   Hola ${userSaved.tx_name}, gracias por registrarte en Saturno. 
   
   Para activar tu cuenta por favor hace click aquí:
   
   https://saturno.fun/activate/${userSaved.tx_email}/${hash}`;
-  
-  
-  
-      Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
-        console.log('mail ok', resp);
-      }).catch(err => {
-        console.log('fallo', err)
-      })
-  
-      res.status(201).json({
-        ok: true,
-        msg: "Usuario guardado correctamente.",
-        user: userSaved
-      });
-  
-    }).catch((err) => {
-      return res.status(400).json({
-        ok: false,
-        msg: "Error al guardar el usuario.",
-        errors: err
-      });
-  
+
+
+
+    Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
+      console.log('mail ok', resp);
+    }).catch(err => {
+      console.log('fallo', err)
+    })
+
+    res.status(201).json({
+      ok: true,
+      msg: "Usuario guardado correctamente.",
+      user: userSaved
     });
-  
-  
-  }
-  
+
+  }).catch((err) => {
+    return res.status(400).json({
+      ok: false,
+      msg: "Error al guardar el usuario.",
+      errors: err
+    });
+
+  });
+
+
+}
+
 function activateUser(req: Request, res: Response) {
   // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
 
@@ -113,15 +113,15 @@ function activateUser(req: Request, res: Response) {
 }
 
 async function loginSocial(req: Request, res: Response) {
-// login admins social (if not exist then create it)
+  // login admins social (if not exist then create it)
 
   const token = req.body.token;
+  const platform = req.body.platform;
   const isAdmin = req.body.isAdmin;
-  const socialUser: Social = req.body.user; // social
 
-  await verify(socialUser.txPlatform, token).then(() => {
+  await verify(platform, token).then((payload) => {
 
-    User.findOne({ tx_email: socialUser.txEmail })
+    User.findOne({ tx_email: payload.tx_email })
       .populate('id_company')
       .then(userDB => {
 
@@ -205,12 +205,12 @@ async function loginSocial(req: Request, res: Response) {
           // el user no existe, hay que crearlo.
 
           var user = new User();
-          user.tx_email = socialUser.txEmail;
-          user.tx_name = socialUser.txName;
+          user.tx_email = payload.tx_email;
+          user.tx_name = payload.tx_name;
           user.tx_password = ':)';
-          user.tx_img = socialUser.txImage;
+          user.tx_img = payload.tx_img;
           user.bl_social = true;
-          user.tx_platform = socialUser.txPlatform;
+          user.tx_platform = platform;
           user.tm_lastlogin = new Date();
           user.tm_createdat = new Date();
           user.id_role = isAdmin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
@@ -270,7 +270,7 @@ async function loginSocial(req: Request, res: Response) {
 }
 
 function loginUser(req: Request, res: Response) {
-// login admins and customers with email
+  // login admins and customers with email
 
   var body = req.body;
 
@@ -315,6 +315,7 @@ function loginUser(req: Request, res: Response) {
       // Le quito tx_company_welcome para evitar problemas con caracteres de 2 bytes 
       // al decodificar con atob() en el frontend
       newUser.id_company = 'eliminado solo para el token';
+      newUser.tx_password = ":)";
       var token = Token.getJwtToken({ newUser });
 
       userDB.tm_lastlogin = new Date();
@@ -336,15 +337,8 @@ function loginUser(req: Request, res: Response) {
             break;
         };
 
-        if(userDB.id_role === 'CUSTOMER_ROLE'){
-          return res.status(200).json({
-            ok: true,
-            msg: "Cliente logueado correctamente",
-            user: userDB,
-            home
-          });
-        }
-        
+
+        // ADMIN
         res.status(200).json({
           ok: true,
           msg: "Usuario logueado correctamente",
@@ -432,18 +426,24 @@ function updateToken(req: any, res: Response) {
   });
 }
 
-async function verify(platform: string, token: string): Promise<void> {
+async function verify(platform: string, user_token: string): Promise<any> {
 
   return new Promise(async (resolve, reject) => {
     // GOOGLE TOKEN VERIFY
     if (platform === 'google') {
       const credentials = await oauthClient.verifyIdToken({
-        idToken: token,
+        idToken: user_token,
         audience: GOOGLE_CLIENT_ID
       });
       const payload = credentials.getPayload();
-      if( payload.email_verified && payload.exp * 1000 > + new Date()) {
-        return resolve();
+      if (payload.email_verified && payload.exp * 1000 > + new Date()) {
+
+        let user = new User();
+        user.tx_email = payload.email;
+        user.tx_name = payload.name;
+        user.tx_img = payload.picture;
+
+        return resolve(user);
       } else {
         return reject();
       }
@@ -451,14 +451,14 @@ async function verify(platform: string, token: string): Promise<void> {
 
     // FACEBOOK TOKEN VERIFY
     if (platform === 'facebook') {
+
+      //1. A partir del user_token que envía el usuario obtengo el access_token para verificar la validez del token
       const app_id = environment.FB_APP_ID;
       const app_secret = environment.FB_APP_SECRET;
-      const access_token_url = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
+      const endpoint_access_token = 'https://graph.facebook.com/oauth/access_token?client_id=' + app_id + '&client_secret=' + app_secret + '&grant_type=client_credentials';
 
-      // get app_token
       let access_token: string = await new Promise((resolve, reject) => {
-
-        https.get(access_token_url, (response: any) => {
+        https.get(endpoint_access_token, (response: any) => {
           var body = '';
           response.on('data', function (chunk: any) {
             body += chunk;
@@ -468,13 +468,12 @@ async function verify(platform: string, token: string): Promise<void> {
             resolve(fbResponse.access_token);
           });
         });
-
       })
 
-      // app_token and user_token validation
-      const valid_token = 'https://graph.facebook.com/debug_token?input_token=' + token + '&access_token=' + access_token
-      let output: facebookBackendResponse = await new Promise((resolve, reject) => {
-        https.get(valid_token, (response: any) => {
+      // 2. una vez que obtuve el access_token, verifico la validez del token
+      const endpoint_verify = 'https://graph.facebook.com/debug_token?input_token=' + user_token + '&access_token=' + access_token
+      let access_token_response: facebookBackendResponse = await new Promise((resolve, reject) => {
+        https.get(endpoint_verify, (response: any) => {
           var body = '';
           response.on('data', function (chunk: any) {
             body += chunk;
@@ -486,8 +485,31 @@ async function verify(platform: string, token: string): Promise<void> {
         });
       })
 
-      if (output.data.is_valid) {
-        return resolve();
+      if (access_token_response.data.is_valid) {
+        // 3. si el token es válido, consulto la data del usuario para devolver un objeto que luego va a encapsular jwt
+        // https://graph.facebook.com/{user-id}?fields=id,name,email,picture&access_token={user-token} 
+
+        let user_data: any = await new Promise((resolve, reject) => {
+          const endpoint_user_data = `https://graph.facebook.com/${access_token_response.data.user_id}?fields=id,name,email,picture&access_token=${user_token}`;
+
+          https.get(endpoint_user_data, (response: any) => {
+            var body = '';
+            response.on('data', function (chunk: any) {
+              body += chunk;
+            });
+            response.on('end', function () {
+              var userDataResponse = JSON.parse(body);
+              resolve(userDataResponse);
+            });
+          });
+        })
+
+        let user = new User();
+        user.tx_email = user_data.email;
+        user.tx_name = user_data.name;
+        user.tx_img = user_data.picture.data.url;
+
+        return resolve(user);
       } else {
         return reject();
       }

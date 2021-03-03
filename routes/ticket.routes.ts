@@ -17,7 +17,7 @@ ticketRoutes.get('/readtickets/:idCompany', ticketController.readTickets);
 ticketRoutes.get('/readticket/:idTicket', ticketController.readTicket);
 ticketRoutes.post('/callwaiter', ticketController.callWaiter);
 ticketRoutes.put('/actualizarsocket', ticketController.updateSocket);
-ticketRoutes.post('/validateticket', ticketController.validateTicket);
+ticketRoutes.post('/validateticket', mdAuth.verificaToken, ticketController.validateTicket);
 
 ticketRoutes.post('/endticket', ticketController.endTicket);
 

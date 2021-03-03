@@ -126,7 +126,7 @@ async function checkScheduled() {
 		}
 
 		// -------------------------------------------------------------
-		// BEFORE 2HS AT TM_RESERVE: TABLE RESERVE AND TICKET ASSIGN
+		// BEFORE 2HS AT TM_RESERVE: RESERVE TABLES AND ASSIGN TO TICKET
 		// -------------------------------------------------------------
 
 		if (ticket.tx_status === 'scheduled' && timeToReserve) {
@@ -627,7 +627,7 @@ function createTicket(req: Request, res: Response) {
 			nm_persons: nmPersons,
 			bl_contingent: blContingent,
 			bl_priority: false,
-			tx_name: txName, 
+			tx_name: txName,
 			tx_platform: null,
 			tx_email: txEmail,
 			nm_phone: nmPhone,
@@ -682,9 +682,6 @@ function createTicket(req: Request, res: Response) {
 			}
 
 
-
-
-
 		}).catch((err) => {
 
 			return res.status(400).json({
@@ -706,47 +703,15 @@ function createTicket(req: Request, res: Response) {
 
 };
 
-async function validateTicket(req: Request, res: Response) {
+async function validateTicket(req: any, res: Response) {
 	// WAITING -> TERMINATED || PENDING || SCHEDULED
 	const idTicket = req.body.idTicket;
-	const txPlatform = req.body.txPlatform;
-	const txToken = req.body.txToken || null;
-	const txEmail = req.body.txEmail || null;
-
-	if (!txPlatform || !txEmail) {
-		if (txPlatform) {
-			return res.status(400).json({
-				ok: false,
-				msg: `No se pudo obtener el usuario de ${txPlatform} para validar el ticket`,
-				ticket: null
-			})
-		} else {
-			return res.status(400).json({
-				ok: false,
-				msg: `No se recibió la red social para validar el ticket`,
-				ticket: null
-			})
-		}
-	}
-
-	// txPlatform === 'email' no need validation
-	if(txPlatform === 'google' || txPlatform === 'facebook'){
-		await user.verify(txPlatform, txToken).catch(() => {
-			return res.status(400).json({
-				ok: false,
-				msg: `El Token de Google no es válido.`,
-				ticket: null
-			})
-		})
-	}
-
+	const user = req.usuario; // inject on mdAuth
 	const server = Server.instance; // singleton
 
-	return await Ticket.findById(idTicket)
+	Ticket.findById(idTicket)
 		.populate('id_company')
 		.then(async (ticketWaiting) => {
-
-
 			// 1. Verifico que el ticket existe
 			if (!ticketWaiting) {
 				return res.status(400).json({
@@ -787,10 +752,10 @@ async function validateTicket(req: Request, res: Response) {
 			})
 
 			// 3. Verifico que el usuario no tenga otro ticket activo para este negocio.
-			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === txPlatform && ticket.tx_email === txEmail && ticket._id !== idTicket)
+			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === user.tx_platform && ticket.tx_email === user.tx_email && ticket._id !== idTicket)
 			if (ticketsUser && ticketsUser.length > 0) {
-				ticketWaiting.tx_platform = txPlatform;
-				ticketWaiting.tx_email = txEmail;
+				ticketWaiting.tx_platform = user.tx_platform;
+				ticketWaiting.tx_email = user.tx_email;
 				ticketWaiting.tx_status = 'terminated';
 				ticketWaiting.tm_end = new Date();
 				return await ticketWaiting.save().then((ticketSaved: Ticket) => {
@@ -807,8 +772,8 @@ async function validateTicket(req: Request, res: Response) {
 			if (ticketWaiting.cd_tables.length > 0) {
 				const ticketsTable = ticketsActiveCompany.filter(ticket => ticket.tx_status === 'scheduled' && ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) && ticket.tm_reserve?.getHours() === ticketWaiting.tm_reserve?.getHours() && ticket._id !== ticketWaiting._id)
 				if (ticketsTable && ticketsTable.length > 0) {
-					ticketWaiting.tx_platform = txPlatform;
-					ticketWaiting.tx_email = txEmail;
+					ticketWaiting.tx_platform = user.tx_platform;
+					ticketWaiting.tx_email = user.tx_email;
 					ticketWaiting.tx_status = 'terminated';
 					ticketWaiting.tm_end = new Date();
 					return await ticketWaiting.save().then((ticketSaved: Ticket) => {
@@ -824,8 +789,8 @@ async function validateTicket(req: Request, res: Response) {
 
 
 			// Pasó todas las verificaciones anteriores, se valida el ticket.
-			ticketWaiting.tx_platform = txPlatform;
-			ticketWaiting.tx_email = txEmail;
+			ticketWaiting.tx_platform = user.tx_platform;
+			ticketWaiting.tx_email = user.tx_email;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
@@ -841,7 +806,7 @@ async function validateTicket(req: Request, res: Response) {
 					response = `Reserva pendiente de aprobación`
 				}
 
-				if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve) {
+				if ((user.tx_platform === 'facebook' || user.tx_platform === 'google') && ticketSaved.tm_reserve) {
 					const messageToUser = `
 Hola ${ticketWaiting.tx_name}, la reserva de ${cdTablesStr} ${cdTables} en ${txCompanyName} quedó confirmada.
 
@@ -852,7 +817,7 @@ https://saturno.fun/public/tickets
 
 Muchas Gracias!
 Saturno.fun`;
-					Mail.sendMail('reservas', txEmail, messageToUser);
+					Mail.sendMail('reservas', user.tx_email, messageToUser);
 				}
 
 				return res.status(200).json({

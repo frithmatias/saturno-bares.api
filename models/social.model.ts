@@ -29,7 +29,4 @@ interface facebookFrontendResponse {
   export interface Social {
     txPlatform: string;
     txToken: string;
-    txEmail: string;
-    txName: string;
-    txImage: string;
   }
