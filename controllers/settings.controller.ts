@@ -20,22 +20,50 @@ function readSettings(req: Request, res: Response) {
 }
 
 function updateSettings(req: Request, res: Response) {
-
-    const idCompany = req.body._id;
+    
+    const idSettings = req.body._id; 
     const blSpm = req.body.bl_spm;
     const blSchedule = req.body.bl_schedule;
     const blQueue = req.body.bl_queue;
-    Settings.findByIdAndUpdate(idCompany, { bl_spm: blSpm, bl_schedule: blSchedule, bl_queue: blQueue }, {new: true}).then(settingsUpdated => {
-        return res.status(200).json({
-            ok: true,
-            msg: 'Ajustes guardados correctamente',
-            settings: settingsUpdated
+    const tmWorking = req.body.tm_working;
+
+    Settings.findById(idSettings).then(companySettings => {
+
+        if(!companySettings){
+            return res.status(400).json({
+                ok: false, 
+                msg: 'No existen ajustes para el comercio',
+                settings: null
+            })
+        }
+
+
+        companySettings.bl_spm = blSpm; 
+        companySettings.bl_schedule = blSchedule; 
+        companySettings.bl_queue = blQueue; 
+        companySettings.tm_working = tmWorking; 
+
+        companySettings.save().then(settingsUpdated => {
+
+            return res.status(200).json({
+                ok: true,
+                msg: 'Ajustes guardados correctamente',
+                settings: settingsUpdated
+            })
+
+        }).catch((err)=>{
+            return res.status(400).json({
+                ok: false,
+                msg: 'Error al guardar los ajustes para el comercio',
+                settings: err
+            })
         })
+
 
     }).catch(() => {
         return res.status(400).json({
             ok: false,
-            msg: 'Error al actualizar los ajustes',
+            msg: 'Error al obtener los ajustes para el comercio',
             settings: null
         })
     })

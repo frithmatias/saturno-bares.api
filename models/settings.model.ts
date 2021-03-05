@@ -5,7 +5,7 @@ const settingsSchema = new Schema({
     bl_spm: {type: Boolean, required: [true, 'El bl_spm es necesario']},
     bl_schedule: {type: Boolean, required: [true, 'El bl_schedule es necesario']},
     bl_queue: {type: Boolean, required: [true, 'El bl_queue es necesario']},
-
+    tm_working: {type: [[Number]], required: false},
 },{ collection: "settings" })
 
 export interface Settings extends Document { 
@@ -13,6 +13,7 @@ export interface Settings extends Document {
     bl_spm: boolean;
     bl_schedule: boolean;
     bl_queue: boolean;
+    tm_working: number[][];
 }
 
 export const Settings = model<Settings>('Settings', settingsSchema);

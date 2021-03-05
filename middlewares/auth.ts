@@ -4,7 +4,6 @@ import Token from '../classes/token';
 let verificaToken = (req: any, res: Response, next: NextFunction) => {
 
     const userToken = req.get('turnos-token' || '');
-    console.log(userToken)
     Token.checkToken(userToken).then((decoded: any) => {
             req.usuario = decoded.payload.newUser;
             next(); 

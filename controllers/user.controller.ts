@@ -71,43 +71,107 @@ function registerUser(req: any, res: Response) {
 
 }
 
-function activateUser(req: Request, res: Response) {
-  // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
+function loginUser(req: Request, res: Response) {
+  // login admins and customers with email
 
-  const email = req.body.email;
-  let hash = req.body.hash;
-  hash = hash.replace(/_slash_/gi, '/')
-  hash = hash.replace(/_dot_/gi, '.')
+  var body = req.body;
 
-  User.findOne({ tx_email: email }).then(userDB => {
+  User.findOne({ tx_email: body.tx_email })
+    .populate('id_company')
+    .then(userDB => {
 
-    if (!userDB) {
-      return res.status(400).json({
-        ok: false,
-        msg: 'No existe el usuario a activar',
-        user: null
+      if (!userDB) {
+        return res.status(400).json({
+          ok: false,
+          msg: "Usuaro o Contraseña incorrecta."
+        });
+      }
+
+      if (userDB.bl_social) {
+        return res.status(400).json({
+          ok: false,
+          msg: "Para esa cuenta ingrese con el botón de " + userDB.tx_platform
+        });
+      }
+
+      if (!bcrypt.compareSync(body.tx_password, userDB.tx_password)) {
+        return res.status(400).json({
+          ok: false,
+          msg: "Contraseña o usuario incorrecto."
+        });
+      }
+
+      if (!userDB.bl_active && (userDB.id_role === 'ADMIN_ROLE' || userDB.id_role === 'CUSTOMER_ROLE')) {
+        return res.status(400).json({
+          ok: false,
+          msg: "El usuario no fué activado."
+        });
+      }
+
+
+      // Si llego hasta acá, el user y la contraseña son correctas, creo el token
+
+      // rompo la referencia con assign() y uso toObject() para usar extraer del objeto
+      // la data que está en userDB._doc con un getter
+      let newUser: any = Object.assign({}, userDB.toObject());
+      // Le quito tx_company_welcome para evitar problemas con caracteres de 2 bytes 
+      // al decodificar con atob() en el frontend
+      newUser.id_company = 'eliminado solo para el token';
+      newUser.tx_password = ":)";
+      var token = Token.getJwtToken({ newUser });
+
+      userDB.tm_lastlogin = new Date();
+      if(userDB.id_role === 'CUSTOMER_ROLE' && body.bl_admin){
+        // el usuario esta registrado como cliente pero intenta loguearse como un comercio
+        // si llega la petición es porque acepta convertir el ROL a ADMIN en el frontend.
+        userDB.id_role = 'ADMIN_ROLE';
+      }
+      
+
+      userDB.save().then(async () => {
+
+        userDB.tx_password = ":)";
+
+        let home;
+        switch (userDB.id_role) {
+          case 'WAITER_ROLE':
+            home = '/waiter/home';
+            break;
+          case 'ADMIN_ROLE':
+            home = '/admin/home';
+            break;
+          case 'CUSTOMER_ROLE':
+            home = '/public/tickets';
+            break;
+        };
+
+
+        // ADMIN
+        res.status(200).json({
+          ok: true,
+          msg: "Usuario logueado correctamente",
+          token: token,
+          user: userDB,
+          menu: await obtenerMenu(userDB.id_role),
+          home
+        });
+
+      }).catch((err) => {
+        return res.status(500).json({
+          ok: false,
+          msg: "Error al actualizar la fecha de login",
+          errors: err
+        });
       })
-    }
 
-    if (!bcrypt.compareSync(String(userDB._id), hash)) {
-      return res.status(400).json({
+    }).catch((err) => {
+      return res.status(500).json({
         ok: false,
-        id: String(userDB._id),
-        hash,
-        msg: "No se pudo validar el usuario."
+        msg: "Error al buscar un user",
+        errors: err
       });
-    }
 
-    userDB.bl_active = true;
-    userDB.save().then(userActivated => {
-      return res.status(200).json({
-        ok: true,
-        msg: 'Usuario activado correctamente',
-        user: userActivated
-      })
     })
-
-  })
 
 
 }
@@ -147,12 +211,17 @@ async function loginSocial(req: Request, res: Response) {
             newUser.id_company = 'eliminado solo para el token';
             var token = Token.getJwtToken({ newUser });
 
-            userDB.updateOne({ tm_lastlogin: + new Date().getTime() })
+            if(userDB.id_role === 'CUSTOMER_ROLE' && isAdmin){
+              // el usuario esta registrado como cliente pero intenta loguearse como un comercio
+              // si llega la petición es porque acepta convertir el ROL a ADMIN en el frontend.
+              userDB.id_role = 'ADMIN_ROLE';
+            }
+
+            userDB.updateOne({ tm_lastlogin: + new Date().getTime(), id_role: userDB.id_role })
               .then(async userSaved => {
 
                 userSaved.tx_password = ":)";
                 await obtenerMenu(userDB.id_role).then(menu => {
-
 
                   let home;
                   switch (userDB.id_role) {
@@ -269,101 +338,43 @@ async function loginSocial(req: Request, res: Response) {
 
 }
 
-function loginUser(req: Request, res: Response) {
-  // login admins and customers with email
+function activateUser(req: Request, res: Response) {
+  // https://localhost/register/activate/rmfrith@yahoo.com.ar/asfasfdasdfasdf
 
-  var body = req.body;
+  const email = req.body.email;
+  let hash = req.body.hash;
+  hash = hash.replace(/_slash_/gi, '/')
+  hash = hash.replace(/_dot_/gi, '.')
 
-  User.findOne({ tx_email: body.tx_email })
-    .populate('id_company')
-    .then(userDB => {
+  User.findOne({ tx_email: email }).then(userDB => {
 
-      if (!userDB) {
-        return res.status(400).json({
-          ok: false,
-          msg: "Usuaro o Contraseña incorrecta."
-        });
-      }
-
-      if (userDB.bl_social) {
-        return res.status(400).json({
-          ok: false,
-          msg: "Para esa cuenta ingrese con el botón de " + userDB.tx_platform
-        });
-      }
-
-      if (!bcrypt.compareSync(body.tx_password, userDB.tx_password)) {
-        return res.status(400).json({
-          ok: false,
-          msg: "Contraseña o usuario incorrecto."
-        });
-      }
-
-      if (!userDB.bl_active && (userDB.id_role === 'ADMIN_ROLE' || userDB.id_role === 'CUSTOMER_ROLE')) {
-        return res.status(400).json({
-          ok: false,
-          msg: "El usuario no fué activado."
-        });
-      }
-
-
-      // Si llego hasta acá, el user y la contraseña son correctas, creo el token
-
-      // rompo la referencia con assign() y uso toObject() para usar extraer del objeto
-      // la data que está en userDB._doc con un getter
-      let newUser: any = Object.assign({}, userDB.toObject());
-      // Le quito tx_company_welcome para evitar problemas con caracteres de 2 bytes 
-      // al decodificar con atob() en el frontend
-      newUser.id_company = 'eliminado solo para el token';
-      newUser.tx_password = ":)";
-      var token = Token.getJwtToken({ newUser });
-
-      userDB.tm_lastlogin = new Date();
-
-      userDB.save().then(async () => {
-
-        userDB.tx_password = ":)";
-
-        let home;
-        switch (userDB.id_role) {
-          case 'WAITER_ROLE':
-            home = '/waiter/home';
-            break;
-          case 'ADMIN_ROLE':
-            home = '/admin/home';
-            break;
-          case 'CUSTOMER_ROLE':
-            home = '/public/tickets';
-            break;
-        };
-
-
-        // ADMIN
-        res.status(200).json({
-          ok: true,
-          msg: "Usuario logueado correctamente",
-          token: token,
-          user: userDB,
-          menu: await obtenerMenu(userDB.id_role),
-          home
-        });
-
-      }).catch((err) => {
-        return res.status(500).json({
-          ok: false,
-          msg: "Error al actualizar la fecha de login",
-          errors: err
-        });
-      })
-
-    }).catch((err) => {
-      return res.status(500).json({
+    if (!userDB) {
+      return res.status(400).json({
         ok: false,
-        msg: "Error al buscar un user",
-        errors: err
-      });
+        msg: 'No existe el usuario a activar',
+        user: null
+      })
+    }
 
+    if (!bcrypt.compareSync(String(userDB._id), hash)) {
+      return res.status(400).json({
+        ok: false,
+        id: String(userDB._id),
+        hash,
+        msg: "No se pudo validar el usuario."
+      });
+    }
+
+    userDB.bl_active = true;
+    userDB.save().then(userActivated => {
+      return res.status(200).json({
+        ok: true,
+        msg: 'Usuario activado correctamente',
+        user: userActivated
+      })
     })
+
+  })
 
 
 }
@@ -594,27 +605,7 @@ function obtenerMenu(txRole: string) {
           tx_titulo: 'Web Page',
           tx_icon: 'mdi   mdi-page-layout-header',
           tx_url: '/admin/webpage'
-        }, {
-          tx_titulo: 'Comercios',
-          tx_url: '/admin/companies',
-          tx_icon: 'mdi  mdi-silverware-fork-knife'
-        }, {
-          tx_titulo: 'Sectores',
-          tx_url: '/admin/sections',
-          tx_icon: 'mdi mdi-select-group'
-        }, {
-          tx_titulo: 'Mesas',
-          tx_url: '/admin/tables',
-          tx_icon: 'mdi  mdi-table-furniture',
-        }, {
-          tx_titulo: 'Camareros',
-          tx_icon: 'mdi   mdi-face',
-          tx_url: '/admin/waiters'
-        }, {
-          tx_titulo: 'Encuestas',
-          tx_icon: 'mdi mdi-star',
-          tx_url: '/admin/poll',
-        }
+        } 
       ]
     };
 
