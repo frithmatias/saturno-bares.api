@@ -6,7 +6,6 @@ import { Section } from '../models/section.model';
 import { TableSession } from '../models/table.session.model';
 import { Settings } from '../models/settings.model';
 import { Request, Response } from 'express';
-import user from './user.controller';
 import Server from '../classes/server';
 import spm from '../classes/spm';
 import cron from 'node-cron';
@@ -82,7 +81,7 @@ async function checkScheduled() {
 		const timeToReserve = (ticket.tm_reserve?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
 		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
 
-		// company and reservation data for mail pourposes
+		// company and reservation data for email pourposes
 		const txPlatform = ticket.tx_platform;
 		const txEmail = ticket.tx_email;
 		const txName = ticket.tx_name;
@@ -101,6 +100,7 @@ async function checkScheduled() {
 			ticket.tx_status = 'terminated';
 			ticket.tm_end = new Date();
 			await ticket.save().then((ticketSaved) => {
+				server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
 				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
 			})
@@ -119,6 +119,7 @@ async function checkScheduled() {
 
 				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
 				spm.provide(tablesToProvide, ticket).then(data => {
+					server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 					server.io.to(ticket.id_company._id).emit('update-waiters');
 				})
 
@@ -145,6 +146,7 @@ async function checkScheduled() {
 							table.tx_status = 'reserved';
 							await table.save().then(() => {
 								server.io.to(ticket.id_company._id).emit('update-waiters');
+								server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 							})
 						}
 					}
@@ -311,6 +313,9 @@ async function endTicket(req: Request, res: Response) {
 				})
 			}
 
+			const server = Server.instance; // singleton
+			server.io.to(ticketCancelled.id_company).emit('update-admin'); //schedule update
+
 			if (ticketCancelled?.id_session) {
 
 				let idSession = ticketCancelled.id_session;
@@ -327,8 +332,9 @@ async function endTicket(req: Request, res: Response) {
 						await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
 					}
 
-					const server = Server.instance; // singleton
+
 					server.io.to(ticketCancelled.id_company).emit('update-waiters');
+
 					if (ticketCancelled.id_socket_client) {
 						server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
 					}
@@ -435,7 +441,7 @@ async function readAvailability(req: Request, res: Response) {
 			})
 		})
 
-	// COMPATIBLE TABLES IN SECTION
+	// COMPATIBLE TABLES IN SECTION 
 	await Table.find({ id_section: idSection, nm_persons: { $gte: nmPersons } })
 		.then(resp => compatibleTables = resp.map(table => table.nm_table))
 		.catch(() => {
@@ -485,22 +491,21 @@ async function readAvailability(req: Request, res: Response) {
 	// obtengo el día de la semana de la solicitud de reserva para filtrar los intervalos NO laborales para ese día 
 	const dayWeekReserve = new Date(tmReserve).getDay(); // 0-6 (0 do - 6 sa)
 
-
 	// obtengo los intervalos no laborales de la configuración del comercio para ese día 
 	let sectionDB: any;
 	sectionDB = await Section.findById(idSection).then(sectionDB);
 
 	let settingsDB: any;
-	settingsDB = await Settings.findOne({id_company: sectionDB.id_company}).then(settingsDB);
-	
+	settingsDB = await Settings.findOne({ id_company: sectionDB.id_company }).then(settingsDB);
+
 	const workingIntervals = settingsDB.tm_working[dayWeekReserve];
 
 	for (let hr of intervals) {
 		interval++;
-		
+
 		if (interval > 23) { interval = 0 } // [3,4,5....23,0,1,2]
-		
-		if(!workingIntervals.includes(interval)){
+
+		if (!workingIntervals.includes(interval)) {
 			continue; // omit just this loop
 		}
 
@@ -650,13 +655,12 @@ function createTicket(req: Request, res: Response) {
 					id_position: 1
 				})
 
-				firstNumber.save()
-					.catch(() => {
-						return res.status(400).json({
-							ok: false,
-							msg: "El nuevo status no se pudo guardar."
-						});
-					})
+				firstNumber.save().catch(() => {
+					return res.status(400).json({
+						ok: false,
+						msg: "El nuevo status no se pudo guardar."
+					});
+				})
 
 				idPosition = firstNumber.id_position;
 
@@ -699,11 +703,12 @@ function createTicket(req: Request, res: Response) {
 			// obtengo las configuraciones para el comercio
 			const settings = await Settings.findOne({ id_company: ticketSaved.id_company });
 
-			if (txStatus === 'queued') {
-				// si spm esta activado hago un push 
-				let spmResp: string = settings?.bl_spm ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
+			server.io.to(sectionDB.id_company).emit('update-waiters');
+			server.io.to(sectionDB.id_company).emit('update-admin'); //schedule update
 
-				server.io.to(sectionDB.id_company).emit('update-waiters');
+			if (txStatus === 'queued') {
+				// si spm esta activado hago un push es en el metodo push donde el ticket puede quedar 'requested'
+				let spmResp: string = settings?.bl_spm ? await spm.push(ticket) : 'Ticket guardado y esperando mesa.';
 
 				return res.status(201).json({
 					ok: true,
@@ -760,6 +765,7 @@ async function validateTicket(req: any, res: Response) {
 	Ticket.findById(idTicket)
 		.populate('id_company')
 		.then(async (ticketWaiting) => {
+
 			// 1. Verifico que el ticket existe
 			if (!ticketWaiting) {
 				return res.status(400).json({
@@ -802,6 +808,7 @@ async function validateTicket(req: any, res: Response) {
 			// 3. Verifico que el usuario no tenga otro ticket activo para este negocio.
 			const ticketsUser = ticketsActiveCompany.filter(ticket => ticket.tx_platform === user.tx_platform && ticket.tx_email === user.tx_email && ticket._id !== idTicket)
 			if (ticketsUser && ticketsUser.length > 0) {
+				server.io.to(ticketWaiting.id_company._id).emit('update-admin'); // schedule update
 				ticketWaiting.tx_platform = user.tx_platform;
 				ticketWaiting.tx_email = user.tx_email;
 				ticketWaiting.tx_status = 'terminated';
@@ -840,8 +847,10 @@ async function validateTicket(req: any, res: Response) {
 			ticketWaiting.tx_platform = user.tx_platform;
 			ticketWaiting.tx_email = user.tx_email;
 			ticketWaiting.tx_status = ticketWaiting.cd_tables.length === 0 ? 'pending' : 'scheduled';
+
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
+				server.io.to(ticketSaved.id_company._id).emit('update-admin'); // update schedule
 
 				// QUEDO AGENDADO Y ASIGNADO
 				let response: string = '';

@@ -272,7 +272,7 @@ let initTables = async (req: Request, res: Response) => {
 
 }
 
-// ADMIN: PENDING <-> SCHEDULED -> LO TOMA EL CRON
+// ADMIN: PENDING -> SCHEDULED -> LO TOMA EL CRON
 let assignTablesPending = (req: Request, res: Response) => {
     // asigna mesas a pendientes en agenda 
 
@@ -323,10 +323,9 @@ let assignTablesPending = (req: Request, res: Response) => {
     })
 }
 
-// WAITER: REQUESTED <-> ASSIGNED -> LO TOMA SPM
+// WAITER: REQUESTED -> ASSIGNED -> LO TOMA SPM
 let assignTablesRequested = (req: Request, res: Response) => {
     // asigna mesas a requeridos en cola virtual 
-
     var { idTicket, blPriority, blFirst, cdTables } = req.body;
 
     Ticket.findById(idTicket).then(async ticketDB => {
@@ -343,39 +342,29 @@ let assignTablesRequested = (req: Request, res: Response) => {
         let tables = await Table.find({ id_section: ticketDB.id_section })
         let compatibles = tables.filter(table => table.nm_persons >= ticketDB.nm_persons);
         let newStatus;
-
-
         if (cdTables.length === 0) {
-            // waiter des-asigna todas
             newStatus = compatibles.length === 0 ? 'requested' : 'queued';
         } else {
-            // waiter asigna o re-asigna
             newStatus = 'assigned';
         }
 
-        // MESAS RESERVADAS PARA TICKETS EN AGENDA:
-        // si waiter RE-asigna mesas y esas mesas estaban reservadas (el cron las reservo para el cliente)
-        // entonces des-reserva las des-asignadas 
-        // agarro las mesas que tenía, y le saco las nuevas las que quedan las des-reserva
         if (ticketDB.tx_status === 'assigned' && cdTables.length > 0) {
-            // ambos asignados, de agenda y cola virtual, pueden tener reservas
 
             //1. DES-RESERVA DES-ASIGNADAS: obtengo las mesas del ticket que no estan incluidas en cdTables (mesas nuevas)
             //en ticket [1,2,3] nuevas [3,4] obtiene [1,2]
             const missingTables = ticketDB.cd_tables.filter(table => !cdTables.includes(table))
             let tablesToPause = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: missingTables }, tx_status: 'reserved' });
-
             if (tablesToPause.length > 0) {
                 for (let table of tablesToPause) {
                     table.tx_status = 'paused';
                     await table.save();
                 }
             }
+
             //2. RESERVA NUEVAS ASIGNADAS:
             //en ticket [1,2,3] nuevas [3,4] obtiene [4]
             const newTables = cdTables.filter((table: number) => !ticketDB.cd_tables.includes(table))
             let tablesToReserve = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: newTables }, tx_status: { $ne: 'busy' } });
-
             if (tablesToReserve.length > 0) {
                 for (let table of tablesToReserve) {
                     table.tx_status = 'reserved';
@@ -384,7 +373,7 @@ let assignTablesRequested = (req: Request, res: Response) => {
             }
         }
 
-        ticketDB.cd_tables = cdTables; // asigno las mesas nuevas al ticket
+        ticketDB.cd_tables = cdTables; 
         ticketDB.tx_status = newStatus;
         ticketDB.bl_priority = blPriority;
         ticketDB.save().then(ticketSaved => {
@@ -397,7 +386,8 @@ let assignTablesRequested = (req: Request, res: Response) => {
                 let tablesToProvide: Table[] = [];
                 // obtengo las mesas para pasarle a provide()
                 if (ticketSaved.tx_status === 'queued') {
-                    tablesToProvide = [compatibles[0]]; // todo: debe tomar la mesa mas compatible, no la primera
+                    // todo: a provide() le debo pasar la mesa mas compatible, no la primera
+                    tablesToProvide = [compatibles[0]]; 
                 }
 
                 else if (ticketSaved.tx_status === 'assigned') {
@@ -412,6 +402,8 @@ let assignTablesRequested = (req: Request, res: Response) => {
                     })
                 }
 
+                // Este método pasa por alto al PUSH, porque PUSH busca mesas compatibles y disponibles, pero en este caso el ticket 
+                // ya tiene mesas asignadas (no puede ser cualquier mesa) por lo tanto llama directo a provide() para proveer las mesas asignadas.
                 spm.provide(tablesToProvide, ticketSaved).then((resp) => {
 
                     return res.status(200).json({

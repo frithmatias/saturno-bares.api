@@ -598,7 +598,7 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/profile',
           tx_icon: 'mdi mdi-shield-star'
         }, {
-          tx_titulo: 'Wizard',
+          tx_titulo: 'Iniciar Asistente',
           tx_icon: 'mdi mdi-wizard-hat',
           tx_url: '/admin/wizard',
         }, {

@@ -62,8 +62,8 @@ export default class Spm {
                     resolve('Sin mesa disponible, el ticket quedo en cola');
                     return;
                 } else {
-
-                    const respProvide = Spm.provide([idleTables[0]], ticket);
+                    // todo: a provide() le debo pasar la mesa mas compatible, no la primera
+                    const respProvide = Spm.provide([idleTables[0]], ticket); 
                     resolve(respProvide);
                     return;
 
@@ -103,20 +103,20 @@ export default class Spm {
                     if (ticketsDB.length === 0) { return resolve('Pull: No hay tickets asignados para esta mesa') }
 
                     // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
-
-                    // AUTOMATIC MODE 
+                                        
                     // 1. primer 'assigned' que le corresponda la mesa con priority true
+                    
+                    // SPM: ON - AUTOMATIC  
                     // 2A. primer 'queued' compatible con la mesa con priority true
                     // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' compatible con la mesa 
 
-                    // MANUAL AUTOMATIC
-                    // 1. primer 'assigned' que le corresponda la mesa con priority true
+                    // SPM: OFF - MANUAL (no aprovisiona queued)
                     // 2B. primer 'assigned' que le corresponda la mesa 
 
                     // declaro el ticket, si lo encuentro se lo voy a pasar a provide()
                     let ticketToProvide: Ticket;
 
-                    // 1. (AUTO ON AND OFF)
+                    // 1. (SPM: ON || SPM: OFF)
                     ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
                         ticket.tx_status === 'assigned' &&
                         ticket.cd_tables?.includes(table.nm_table) &&
@@ -127,7 +127,7 @@ export default class Spm {
                     const settings = await Settings.findOne({ id_company: ticketsDB[0].id_company });
 
                     if (settings?.bl_spm) {
-                        // AUTO ON
+                        // SPM: ON
                         // 2A.
                         if (!ticketToProvide) {
                             ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
@@ -146,7 +146,7 @@ export default class Spm {
                         }
 
                     } else {
-                        // AUTO OFF
+                        // SPM: OFF
                         // 2B. primer 'assigned' que le corresponda la mesa 
                         if (!ticketToProvide) {
                             ticketToProvide = ticketsDB.filter((ticket: Ticket) =>
@@ -197,10 +197,16 @@ export default class Spm {
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
         return new Promise(async (resolve, reject) => {
 
+            // Si se trata de un asignado, tenga una o mas mesas, o sea un asignado pro agenda o por cola virtual,
+            // las mesas siempre se RESERVAN antes una por una antes de ponerlas en estado WAITING y el ticket en 
+            // estado PROVIDED.
+
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
-                    if (table.tx_status === 'idle' || table.tx_status === 'paused') {
+                    // La mesa puede salir del estado PAUSED y pasar a RESERVED SOLO si la mesa esta IDLE o si esta 
+                    // PAUSED pero el ticket viene de Agenda.
+                    if (table.tx_status === 'idle' || (ticket.tm_reserve !== null && table.tx_status === 'paused')) {
                         table.tx_status = 'reserved';
                         await table.save();
                     }
@@ -217,6 +223,7 @@ export default class Spm {
 
             if ((ticket.tx_status === 'assigned' && allReserved) || (ticket.tx_status === 'queued')) {
 
+                // 1. Start Session
                 let session = new TableSession();
                 let idTables: string[] = tables.map(table => table._id);
                 session.id_tables = idTables;
@@ -224,10 +231,12 @@ export default class Spm {
                 session.tm_start = new Date();
                 session.save().then(async sessionSaved => {
 
+                    // 2. Set Each Table as WAITING customer
                     for (let [index, table] of tables.entries()) {
                         table.tx_status = 'waiting';
                         table.id_session = sessionSaved._id;
 
+                        // 3. Set Ticket as PROVIDED
                         await table.save().then(async tableSaved => {
                             ticket.tx_status = 'provided';
                             ticket.id_session = tableSaved.id_session;
