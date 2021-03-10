@@ -166,7 +166,7 @@ function readLocations(req: Request, res: Response) {
 
 }
 
-function readPlacesInLocation(req: Request, res: Response) {
+function getCompaniesByLocation(req: Request, res: Response) {
 
   let idLocation = req.params.idLocation;
 
@@ -190,6 +190,45 @@ function readPlacesInLocation(req: Request, res: Response) {
 
 }
 
+function getCompaniesByCoords(req: Request, res: Response) {
+
+  const lat: number = req.body.lat;
+  const lng: number = req.body.lng;
+
+  const latFrom = Number(lat) - .02;
+  const latTo = Number(lat) + .02;
+
+  const lngFrom = Number(lng) - .02;
+  const lngTo = Number(lng) + .02;
+
+  Company.find({
+    tx_company_lat: { $gt: latFrom, $lt: latTo}, 
+    tx_company_lng: { $gt: lngFrom, $lt: lngTo}
+  })
+  .then(companies => {
+
+    if (!companies) {
+      return res.status(400).json({
+        ok: false,
+        msg: 'Error al obtener los bares en la localidad',
+        companies: null
+      })
+    } else {
+      return res.status(200).json({
+        ok: true,
+        msg: 'Bares en la localidad solicitada obtenidas correctamente',
+        companies
+      })
+    }
+  })
+  
+  // lat -34.6407061 -34.6007061
+  // lng -58.5172707 -58.47727069999999
+
+  return;
+
+}
+
 export = {
   getInfo,
   getClientData,
@@ -197,6 +236,7 @@ export = {
   getScoreItems,
   postScores,
   readLocations,
-  readPlacesInLocation
+  getCompaniesByLocation,
+  getCompaniesByCoords
 }
 

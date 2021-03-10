@@ -19,8 +19,8 @@ var valdTypes = {
     tx_company_location: { type: String, required: false },
     cd_company_location: { type: String, required: false },
     
-    tx_company_lat: { type: String, required: [true, 'El tx_company_lat es necesario'] },
-    tx_company_lng: { type: String, required: [true, 'El tx_company_lng es necesario'] },
+    tx_company_lat: { type: Number, required: [true, 'El tx_company_lat es necesario'] },
+    tx_company_lng: { type: Number, required: [true, 'El tx_company_lng es necesario'] },
     tx_address_street: { type: String, required: [true, 'El tx_address_street es necesario'] },
     tx_address_number: { type: Number, required: [true, 'El tx_address_number es necesario'] },
 
@@ -49,8 +49,8 @@ interface Company extends Document {
     tx_company_string: string;
     tx_company_location: string;
     cd_company_location: string;
-    tx_company_lat: string;
-    tx_company_lng: string;
+    tx_company_lat: number;
+    tx_company_lng: number;
     tx_address_street: string;
     tx_address_number: number;
     tx_email: string;

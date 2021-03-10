@@ -11,7 +11,9 @@ publicRoutes.post('/contact', PublicController.postContact);
 publicRoutes.post('/postscores', PublicController.postScores);
 publicRoutes.get('/getscoreitems/:idSection', PublicController.getScoreItems);
 publicRoutes.get('/locations/:pattern', PublicController.readLocations);
-publicRoutes.get('/findinlocation/:idLocation', PublicController.readPlacesInLocation);
+publicRoutes.get('/getcompaniesbylocation/:idLocation', PublicController.getCompaniesByLocation);
+publicRoutes.post('/getcompaniesbycoords', PublicController.getCompaniesByCoords);
+
 
 
 

@@ -949,15 +949,15 @@ function readUserTickets(req: Request, res: Response) {
 };
 
 function readTickets(req: Request, res: Response) {
+
 	const idCompany = req.params.idCompany;
 	let year = + new Date().getFullYear();
 	let month = + new Date().getMonth();
 	let day = + new Date().getDate();
 	let today = + new Date(year, month, day).getTime();
-	let yesterday = new Date(today - (1000 * 60 * 60 * 24)); // Yesterday
 	Ticket.find({
-		id_company: idCompany, // only this company
-		tm_start: { $gt: yesterday },  // only from Yesterday (now -24hs)
+		id_company: idCompany,
+		tm_end: null
 	})
 		.populate({
 			path: 'id_session id_section id_company',
