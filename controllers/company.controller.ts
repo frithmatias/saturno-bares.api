@@ -5,8 +5,6 @@ import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { Settings } from '../models/settings.model';
 import { ScoreItem } from '../models/scoreitem.model';
-import { pipe } from 'rxjs';
-import { map } from 'rxjs/operators';
 
 // ========================================================
 // Company Methods

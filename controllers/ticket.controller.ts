@@ -653,10 +653,8 @@ function createTicket(req: Request, res: Response) {
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
-
-	const dateReserve = tmIntervals.length > 0 ? new Date(tmIntervals[0]) : null;
-
-	Section.findById(idSection).then(async sectionDB => {
+	
+	Section.findById(idSection).then(async (sectionDB) => {
 
 		if (!sectionDB) {
 			return res.status(400).json({
@@ -665,21 +663,18 @@ function createTicket(req: Request, res: Response) {
 				ticket: null
 			})
 		}
-
+		
 		let idPosition: Number | null = null;
 
 		// si no es reserva, entonces es espontáneo y calculo la posición en la cola virtual
-		if (tmIntervals.length === 0) {
 
+		if (!tmIntervals) {
 			// busco la posición que le corresponde en la cola virtual
 			let position = await Position.findOneAndUpdate({ id_section: idSection, id_year: thisYear, id_month: thisMonth, id_day: thisDay }, { $inc: { id_position: 1 } }, { new: true });
 
 			if (position?.id_position) {
-
 				idPosition = position.id_position;
-
 			} else {
-
 				// si no existe el primer turno lo crea
 				let firstNumber = new Position({
 					id_section: idSection,
@@ -703,7 +698,7 @@ function createTicket(req: Request, res: Response) {
 		}
 
 		// agenda / cola virtual
-		const txStatus = tmIntervals.length > 0 ? (blContingent ? 'scheduled' : 'waiting') : 'queued';
+		const txStatus = tmIntervals ? (blContingent ? 'scheduled' : 'waiting') : 'queued';
 
 		// guardo el ticket
 		let ticket = new Ticket({
@@ -714,7 +709,7 @@ function createTicket(req: Request, res: Response) {
 			bl_contingent: blContingent,
 			bl_priority: false,
 			tx_name: txName,
-			tx_platform: null,
+			tx_platform: blContingent ? 'system' : null,
 			tx_email: txEmail,
 			nm_phone: nmPhone,
 			tx_call: null,
@@ -979,7 +974,7 @@ function readUserTickets(req: Request, res: Response) {
 	const txPlatform = req.params.txPlatform;
 	const txEmail = req.params.txEmail;
 
-	Ticket.find({ tx_platform: txPlatform, tx_email: txEmail, tx_status: { $ne: 'terminated' } })
+	Ticket.find({ tx_email: txEmail })
 		.populate('id_company')
 		.then((userTickets: Ticket[]) => {
 			if (!userTickets) {

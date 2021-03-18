@@ -541,7 +541,7 @@ function obtenerMenu(txRole: string) {
       tx_titulo: 'Indicadores',
       tx_url: '/metrics/dashboard',
       tx_icon: 'mdi mdi-chart-box',
-      subitems: [
+      items: [
         {
           tx_titulo: 'Ocio',
           tx_url: '/metrics/ocio',
@@ -580,14 +580,46 @@ function obtenerMenu(txRole: string) {
       tx_titulo: 'Administrador',
       tx_url: '/admin/dashboard',
       tx_icon: 'mdi  mdi-shield-star',
-      subitems: [
+      items: [
         {
           tx_titulo: 'Home',
           tx_url: '/admin/home',
           tx_icon: 'mdi mdi-home'
         }, {
+          subitems: [{
+            tx_titulo: 'Mensajería',
+            tx_url: '/admin/messages',
+            tx_icon: 'mdi mdi-message'
+          }, {
+            tx_titulo: 'Módulos',
+            tx_url: '/admin/modules',
+            tx_icon: 'mdi mdi-view-module'
+          }, {
+            tx_titulo: 'Días y Horarios',
+            tx_url: '/admin/working',
+            tx_icon: 'mdi mdi-clock-check-outline'
+          }, {
+            tx_titulo: 'Comercios',
+            tx_url: '/admin/companies',
+            tx_icon: 'mdi mdi-store'
+          }, {
+            tx_titulo: 'Sectores',
+            tx_url: '/admin/sections',
+            tx_icon: 'mdi mdi-select-group'
+          }, {
+            tx_titulo: 'Mesas',
+            tx_url: '/admin/tables',
+            tx_icon: 'mdi mdi-silverware-fork-knife'
+          }, {
+            tx_titulo: 'Encuestas',
+            tx_url: '/admin/poll',
+            tx_icon: 'mdi mdi-star'
+          }, {
+            tx_titulo: 'Camareros',
+            tx_url: '/admin/waiters',
+            tx_icon: 'mdi mdi-account-tie'
+          }],
           tx_titulo: 'Ajustes',
-          tx_url: '/admin/settings',
           tx_icon: 'mdi mdi-cog'
         }, {
           tx_titulo: 'Agenda',
@@ -613,7 +645,7 @@ function obtenerMenu(txRole: string) {
       tx_titulo: 'Camarero',
       tx_url: '/waiter/dashboard',
       tx_icon: 'mdi mdi-face',
-      subitems: [
+      items: [
         {
           tx_titulo: 'Home',
           tx_url: '/waiter/home',
