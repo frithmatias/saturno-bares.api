@@ -10,6 +10,7 @@ import MetricController from '../controllers/metric.controller';
 const metricRoutes = Router();
 
 metricRoutes.post('/getusermetrics', mdAuth.verificaToken, MetricController.getUserMetrics);
+metricRoutes.get('/readtickets/:idCompany', mdAuth.verificaToken, MetricController.readTickets);
 
 
 

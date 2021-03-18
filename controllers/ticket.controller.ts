@@ -21,8 +21,8 @@ cron.schedule('*/10 * * * * *', () => {
 moment.locale('es');
 
 // const reserve = "2021-02-25T00:00:00.000Z";
-// console.log(moment(reserve).format('DD [de] MMMM [a las] HH:mm')) // 24 de febrero a las 21:00
-// console.log(moment(reserve).fromNow()); // en 9 dias
+// cnsole.log(moment(reserve).format('DD [de] MMMM [a las] HH:mm')) // 24 de febrero a las 21:00
+// cnsole.log(moment(reserve).fromNow()); // en 9 dias
 
 // ========================================================
 // interfaces
@@ -30,11 +30,12 @@ moment.locale('es');
 
 interface availability {
 	interval: Date;
-	tables: number[] | tablesData[];
-	capacity: number | null; // -> number when has NOT compatible tables, null has compatible options  
+	compatible: number[];
+	available: avData[] | null; // filled if has NOT compatible tables
+	capacity: number | null; // -> number when has NOT compatible tables, null if has compatible options  
 }
 
-interface tablesData {
+interface avData {
 	nmTable: number,
 	nmPersons: number,
 	blReserved: boolean,
@@ -51,7 +52,8 @@ async function checkScheduled() {
 
 	let scheduledTickets: Ticket[] = [];
 
-	await Ticket.find({ tm_reserve: { $ne: null }, tm_provided: null, tm_end: null })
+	// at least 1 element should exist
+	await Ticket.find({ 'tm_intervals.0': { $exists: true }, tm_provided: null, tm_end: null })
 		.populate('id_company')
 		.then(data => {
 			scheduledTickets = data;
@@ -71,14 +73,15 @@ async function checkScheduled() {
 	});
 
 	for (let ticket of scheduledTickets) {
-		if (!ticket.tm_reserve) {
-			return;
+
+		if (ticket.tm_intervals.length === 0) {
+			continue;
 		}
 
 		// relative reservetion time from now to define event
 		const now = +new Date().getTime();
-		const timeToProvide = (ticket.tm_reserve?.getTime() - now) <= 0;
-		const timeToReserve = (ticket.tm_reserve?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
+		const timeToProvide = (ticket.tm_intervals[0]?.getTime() - now) <= 0;
+		const timeToReserve = (ticket.tm_intervals[0]?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
 		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
 
 		// company and reservation data for email pourposes
@@ -89,7 +92,6 @@ async function checkScheduled() {
 		const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
 		const cdTables = ticket.cd_tables;
 		const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-		const tmRemaining = moment(ticket.tm_reserve).fromNow();
 
 
 		// -------------------------------------------------------------
@@ -103,26 +105,6 @@ async function checkScheduled() {
 				server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 				console.log('System: ', `Ticket de ${ticketSaved.tx_name} sin confirmar terminado.`)
 				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
-			})
-		}
-
-		// -------------------------------------------------------------
-		// IN TIME: PROVIDE TABLES	
-		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'assigned' && timeToProvide) {
-			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
-
-				if (!tablesToProvide) {
-					return;
-				}
-
-				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
-				spm.provide(tablesToProvide, ticket).then(data => {
-					server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
-					server.io.to(ticket.id_company._id).emit('update-waiters');
-				})
-
 			})
 		}
 
@@ -160,11 +142,11 @@ async function checkScheduled() {
 						ticket.tx_status = 'assigned';
 						await ticket.save().then((ticketSaved: Ticket) => {
 
-							if ((txPlatform === 'facebook' || txPlatform === 'google') && ticketSaved.tm_reserve && txEmail) {
+							if ((txPlatform === 'facebook' || txPlatform === 'google') && txEmail) {
 								const messageToUser = `
 Hola ${txName}, ya te reservamos ${cdTablesStr} ${cdTables} en ${txCompanyName}!. 
 
-Te esperamos en ${tmRemaining} en ${txCompanyAddress}.
+Te esperamos en ${txCompanyAddress}.
 
 Para ver todas tus reservas o cancelarlas por favor hace click aquí:
 https://saturno.fun/public/tickets
@@ -181,6 +163,28 @@ Saturno.fun`;
 				})
 
 		}
+
+		// -------------------------------------------------------------
+		// IN TIME: PROVIDE TABLES	
+		// -------------------------------------------------------------
+
+		if (ticket.tx_status === 'assigned' && timeToProvide) {
+			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
+
+				if (!tablesToProvide) {
+					return;
+				}
+
+				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
+				spm.provide(tablesToProvide, ticket).then(data => {
+					server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
+					server.io.to(ticket.id_company._id).emit('update-waiters');
+				})
+
+			})
+		}
+
+
 
 
 	}
@@ -222,7 +226,7 @@ function releaseTicket(req: Request, res: Response) {
 
 	let newStatus;
 
-	if (ticket.tm_reserve) {
+	if (ticket.tm_intervals.length > 0) {
 		newStatus = 'scheduled';
 	} else {
 		if (ticket.cd_tables) {
@@ -384,54 +388,35 @@ async function endTicket(req: Request, res: Response) {
 // ========================================================
 // public methods
 // ========================================================
-
 async function readAvailability(req: Request, res: Response) {
-
-	/*
-		Si existen mesas compatibles y disponibles devuelve tables: [nmTables] para que 
-		el cliente puede selecionar una mesa.
-
-			1: {
-				interval: 1, 
-				capacity: 0,
-				tables: [4,5]
-			} 
-	
-		Si NO existen mesas compatibles y disponibles devuelve disponibilidad del sector 
-		para que el cliente pueda solicitar mesa especial que no supere la capacidad máxima
-		
-		1: {
-				interval: "2021-03-18T06:00:00.000Z"
-				capacity: 12
-				tables: [
-					0: {nmTable: 1, nmPersons: 2, blReserved: false}
-					1: {nmTable: 2, nmPersons: 4, blReserved: false}
-					2: {nmTable: 3, nmPersons: 4, blReserved: false}
-					3: {nmTable: 4, nmPersons: 6, blReserved: false}
-				]
-			}
-	*/
-
 
 	const nmPersons = req.body.nmPersons;
 	const idSection = req.body.idSection;
-	const tmReserve = req.body.dtReserve; // utc
-	const dayStart = new Date(tmReserve);
+	const dtReserve = req.body.dtReserve; // '2021-03-16T03:00:00.000Z' utc
+
+	const dayStart = new Date(dtReserve);
 	const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-	const intervals = [...Array(24).keys()]; // 0-23 
 
 	let compatibleTables: number[] = []; // ie. [2,3,5,8] -> only compatible tables
 	let sectionTables: number[] = []; // all tables numbers
-	let sectionTablesFull: tablesData[] = [];  // all tables numbers and persons
+	let sectionTablesFull: avData[] = [];  // all tables numbers and persons
 	let scheduledTickets: Ticket[] = []; // tickets agendados para el día seleccionado y que tengan mesas compatibles asignadas
 	let availability: availability[] = []; // return availability
+
+	// -----------------------------------
+	// TABLES
+	// -----------------------------------
 
 	// ALL TABLES IN SECTION
 	await Table.find({ id_section: idSection })
 		.then(resp => {
 			sectionTables = resp.map(table => table.nm_table);
 			sectionTablesFull = resp.map(table => {
-				return { nmTable: table.nm_table, nmPersons: table.nm_persons, blReserved: false }
+				return {
+					nmTable: table.nm_table,
+					nmPersons: table.nm_persons,
+					blReserved: false
+				}
 			})
 		}).catch(() => {
 			return res.status(500).json({
@@ -452,13 +437,19 @@ async function readAvailability(req: Request, res: Response) {
 			})
 		})
 
+
+
+	// -----------------------------------
+	// TICKETS
+	// -----------------------------------
+
 	if (compatibleTables.length > 0) {
 
-		// GET TICKETS WITH THE COMPATIBLE TABLES ASSIGNED
+		// Si hay mesas compatibles busco los tickets que te tengan asignados esas mesas compatibles
 		await Ticket.find({
 			id_section: idSection,
 			tx_status: { $in: ['scheduled', 'waiting'] },
-			tm_reserve: { $gte: dayStart, $lt: dayEnd },
+			'tm_intervals.0': { $gte: dayStart, $lt: dayEnd },
 			cd_tables: { $in: compatibleTables }
 		}).then(resp => {
 			scheduledTickets = resp
@@ -469,101 +460,143 @@ async function readAvailability(req: Request, res: Response) {
 				availability
 			})
 		})
-
 	} else {
-
-		// GET ALL TICKETS
-		await Ticket.find({ id_section: idSection, tx_status: { $in: ['scheduled', 'waiting'] }, tm_reserve: { $gte: dayStart, $lt: dayEnd } })
-			.then(resp => {
-				scheduledTickets = resp
-			}).catch(() => {
-				return res.status(500).json({
-					ok: false,
-					msg: 'Error al obtener los tickets en la agenda',
-					availability
-				})
+		// Si NO hay mesas compatibles obtengo TODOS los tickets del día para obtener la disponibilidad del sector
+		await Ticket.find({
+			id_section: idSection,
+			tx_status: { $in: ['scheduled', 'waiting'] },
+			'tm_intervals.0': { $gte: dayStart, $lt: dayEnd }
+		}).then(resp => {
+			scheduledTickets = resp
+		}).catch(() => {
+			return res.status(500).json({
+				ok: false,
+				msg: 'Error al obtener los tickets en la agenda',
+				availability
 			})
+		})
 	}
 
-	let interval = dayStart.getUTCHours() - 1; //UTC 24 INTERVALS 
+	let sectionDB: any = await Section.findById(idSection);
+	let settingsDB: any = await Settings.findOne({ id_company: sectionDB.id_company });
 
-	// FILTRO LOS INTERVALOS NO LABORALES 
-	// obtengo el día de la semana de la solicitud de reserva para filtrar los intervalos NO laborales para ese día 
-	const dayWeekReserve = new Date(tmReserve).getDay(); // 0-6 (0 do - 6 sa)
-
-	// obtengo los intervalos no laborales de la configuración del comercio para ese día 
-	let sectionDB: any;
-	sectionDB = await Section.findById(idSection).then(sectionDB);
-
-	let settingsDB: any;
-	settingsDB = await Settings.findOne({ id_company: sectionDB.id_company }).then(settingsDB);
-
+	const dayWeekReserve = new Date(dtReserve).getDay(); // 0-6 (0 do - 6 sa)
 	const workingIntervals = settingsDB.tm_working[dayWeekReserve];
 
-	for (let hr of intervals) {
-		interval++;
+	let intervals: Date[] = [];
 
-		if (interval > 23) { interval = 0 } // [3,4,5....23,0,1,2]
+	let intervalUTCdate = new Date(dayStart);
 
-		if (!workingIntervals.includes(interval)) {
-			continue; // omit just this loop
-		}
+	for (let int of [...Array(48).keys()]) {
+		const interval_hr = Math.trunc(int / 2); // parte entera de un decimal
+		const interval_min = int % 2 === 0 ? 0 : 30;
+		const hr = new Date(intervalUTCdate.getTime() + interval_hr * 60 * 60 * 1000 + interval_min * 60 * 1000);
+		intervals.push(hr);
+	}
 
-		// SI HAY MESAS COMPATIBLES MIS MESAS DISPONIBLES SON LAS MESAS COMPATIBLES, SINO SINO TODAS LAS MESAS
+	for (let [index, interval] of intervals.entries()) {
+		// obtengo todas las mesas disponibles/comatibles y a partir de la disponibilidad resto las reservadas para cada intervalo
 		let availableTables: number[] = compatibleTables.length > 0 ? compatibleTables : sectionTables;
 
-		// TICKETS PARA ESE INTERVALO	
-		let scheduledTicketsInterval = scheduledTickets.filter(ticket => ticket.tm_reserve?.getUTCHours() === interval);
+		// obtengo UTC del intervalo
+		let ThisInterval: Date = interval;
+		const interval_code = ThisInterval.getUTCHours() * 100 + ThisInterval.getMinutes();
+		if (!workingIntervals.includes(interval_code)) {
+			//continue; // omit just this loop
+		}
 
-		// FILTRO LAS MESAS RESERVADAS PARA OTROS TICKETS
-		for (let ticket of scheduledTicketsInterval) { // for each scheduled ticket
-			for (let table of ticket.cd_tables) { // for each table assigned in that ticket
-				if (availableTables.includes(table)) { // remove table from my available tables list
-					availableTables = availableTables.filter(nm => nm != table);
-				}
+		// TABLES RESERVED PREVIOUS INTERVAL
+		let PrevInterval: Date = index === 0 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() - 1 , 30, 0, 0)) : intervals[index - 1];
+		let PrevTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === PrevInterval.getTime()));
+		let PrevTables: number[] = [];
+		for ( let ticket of PrevTickets) {
+			for ( let table of ticket.cd_tables) {
+				PrevTables.push(table);
 			}
 		}
+		
+		// TABLES RESERVED THIS INTERVAL
+		let ThisTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === ThisInterval.getTime()));
+		let ThisTables: number[] = [];
+		for (let ticket of ThisTickets) {
+			for (let table of ticket.cd_tables) {
+				ThisTables.push(table);
+			}
+		}
+
+		// TABLES RESERVED NEXT INTERVAL
+		let NextInterval: Date = index === 47 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() + 24 , 0, 0, 0)) : intervals[index + 1];
+		let NextTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === NextInterval.getTime()));
+		let NextTables: number[] = [];
+		for ( let ticket of NextTickets) {
+			for ( let table of ticket.cd_tables) {
+				NextTables.push(table);
+			}
+		}
+
+		for(let table of sectionTables){
+			if (ThisTables.includes(table) || 
+			(!ThisTables.includes(table) && (PrevTables.includes(table) || NextTables.includes(table)))) {
+				availableTables = availableTables.filter(nm => nm != table);
+			}
+		}
+
+		// FLAGS: 
+		// Verifico todas las celdas INTERVALO/MESA con reserva. Verifico que si para la celda correspondiente al 
+		// siguiente intervalo esta DISPONIBLE entonces la reservo para una bandera (F). Esta bandera es un intervalo que se reserva el 
+		// sistema para esperar al cliente si el cliente decide tomar los intervalos siguientes.
+		// (Un reserva puede ser multidimensional, es decir tomar mas de una mesa y mas de un intervalo [1])
+
+		// Mesas		   1  2  3  4  5  6
+		// intervalo 0530 [-][F][F][-][F][F]
+		// intervalo 0600 [F][1][1][F][2][3]
+		// intervalo 0630 [4][1][1][5][2][F]
+		// intervalo 0700 [4][F][F][F][F][7]
+		// intervalo 0730 [F][-][-][-][-][F]
 
 		if (compatibleTables.length > 0) {
 			// si después del filtro quedaron mesas compatibles, entonces ofrece las mesas compatibles
-			availability.push({ interval: new Date(dayStart.getTime() + (hr * 1000 * 60 * 60)), tables: availableTables, capacity: 0 })
+			availability.push({
+				interval: ThisInterval,
+				compatible: availableTables,
+				available: null,
+				capacity: null
+			})
 		} else {
 			// si después del filtro NO quedaron mesas compatibles, entonces devuleve TODAS las disponibles y la capacidad total del sector
-
 			// armo el array de mesas con toda su data, si tiene ticket lo adjunto
-			let availableTablesToClient: tablesData[] = [];
+
+			let fullTablesData: avData[] = [];
 			for (let table of sectionTablesFull) {
-				if (availableTables.includes(table.nmTable)) {
-					// MESA DISPONIBLE
-					availableTablesToClient.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: false })
-				} else {
-					// MESA NO DISPONIBLE
-					const ticketOwner = scheduledTicketsInterval.find(ticket => ticket.cd_tables.includes(table.nmTable))
-					availableTablesToClient.push({ nmTable: table.nmTable, nmPersons: table.nmPersons, blReserved: true, ticketOwner: ticketOwner })
-				}
+				fullTablesData.push({
+					nmTable: table.nmTable,
+					nmPersons: table.nmPersons,
+					blReserved: !availableTables.includes(table.nmTable),
+					ticketOwner: ThisTickets.find(ticket => ticket.cd_tables.includes(table.nmTable))
+				})
 			}
 
-			// obtiene las capacidades de las mesas DISPONIBLES sin reserva y asumiendo que una mesa para 
-			// menos de 4 personas puede ser para 4 personas
-			let intervalTablesCapacity = availableTablesToClient
-				.filter(table => table.blReserved === false)
-				.map(table => table.nmPersons < 4 ? 4 : table.nmPersons)
 
-			// la capacidad total de las mesas libres (blReserved === false)
+			// SECTION CAPACITY
+			// obtiene las capacidades de las mesas DISPONIBLES (sin reserva) y asume que una mesa para/ menos de 4 personas puede ser para 4 personas
+			let intervalTablesCapacity = fullTablesData.filter(table => table.blReserved === false).map(table => table.nmPersons < 4 ? 4 : table.nmPersons)
+			// obtiene la capacidad total del sector haciendo la sumatoria de las capacidades de las mesas libres (blReserved === false)
 			let capacity: number = 0;
 			if (intervalTablesCapacity.length > 0) {
-				// Si hay mesas disponibles (availableTablesToClient) entonces intervalTablesCapacity será mayór a cero, 
-				// y capacity devolvera la sumatoria de la capacidad de las mesas disponibles
 				capacity = intervalTablesCapacity.reduce((a, b) => a + b) - (intervalTablesCapacity.length * 2) + 2;
 			}
 
-			availability.push({ interval: new Date(dayStart.getTime() + (hr * 1000 * 60 * 60)), tables: availableTablesToClient, capacity })
-
+			availability.push({
+				interval: ThisInterval,
+				compatible: [],
+				available: fullTablesData,
+				capacity
+			})
 		}
 
 	}
 	return res.status(200).json({
-		ok: compatibleTables.length > 0 ? true : false,
+		ok: true,
 		msg: 'Disponibilidad obtenida correctamente',
 		availability
 	})
@@ -579,22 +612,23 @@ async function readPending(req: Request, res: Response) {
 	const firstDay = new Date(idYear, idMonth);
 	const lastDay = new Date(idYear, idMonth + 1);
 
-	await Ticket.find({ id_company: idCompany, tx_status: 'pending', tm_reserve: { $gte: firstDay, $lt: lastDay } })
+	await Ticket.find({ id_company: idCompany, tx_status: { $in: ['pending', 'scheduled'] }, 'tm_intervals.0': { $gte: firstDay, $lt: lastDay } })
 		.populate('id_section')
 		.then((ticketsDB: Ticket[]) => {
 
 			if (!ticketsDB) {
 				return res.status(200).json({
 					ok: false,
-					msg: 'No hay pendientes',
-					pending: null
+					msg: 'No hay pendientes ni agendados',
+					pending: null,
+					scheduled: null
 				})
 			}
 
 			return res.status(200).json({
 				ok: true,
 				msg: 'Pendientes obtenidos correctamente',
-				pending: ticketsDB
+				pending: ticketsDB.filter(ticket => ticket.tx_status === 'pending')
 			})
 
 		})
@@ -613,15 +647,15 @@ function createTicket(req: Request, res: Response) {
 	// ADMIN(SCHEDULE) -> SCHEDULED 
 	// WAITER(VIRTUAL QUEUE) -> QUEUED 
 
-	const { txName, nmPersons, idSection, tmReserve, cdTables, blContingent, idSocket, txEmail, nmPhone } = req.body;
+	const { txName, nmPersons, idSection, tmIntervals, cdTables, blContingent, idSocket, txEmail, nmPhone } = req.body;
 	const server = Server.instance; // singleton
 
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
 
+	const dateReserve = tmIntervals.length > 0 ? new Date(tmIntervals[0]) : null;
 
-	const dateReserve = tmReserve ? new Date(tmReserve) : null;
 	Section.findById(idSection).then(async sectionDB => {
 
 		if (!sectionDB) {
@@ -635,7 +669,7 @@ function createTicket(req: Request, res: Response) {
 		let idPosition: Number | null = null;
 
 		// si no es reserva, entonces es espontáneo y calculo la posición en la cola virtual
-		if (!tmReserve) {
+		if (tmIntervals.length === 0) {
 
 			// busco la posición que le corresponde en la cola virtual
 			let position = await Position.findOneAndUpdate({ id_section: idSection, id_year: thisYear, id_month: thisMonth, id_day: thisDay }, { $inc: { id_position: 1 } }, { new: true });
@@ -669,7 +703,7 @@ function createTicket(req: Request, res: Response) {
 		}
 
 		// agenda / cola virtual
-		const txStatus = tmReserve ? (blContingent ? 'scheduled' : 'waiting') : 'queued';
+		const txStatus = tmIntervals.length > 0 ? (blContingent ? 'scheduled' : 'waiting') : 'queued';
 
 		// guardo el ticket
 		let ticket = new Ticket({
@@ -689,7 +723,7 @@ function createTicket(req: Request, res: Response) {
 			id_position: idPosition || null, // if tx_status:'scheduled' -> idPosition = null
 			id_socket_client: idSocket,
 			id_socket_waiter: null,
-			tm_reserve: dateReserve || null,
+			tm_intervals: tmIntervals || null,
 			tm_start: + new Date().getTime(),
 			tm_init: null,
 			tm_call: null,
@@ -756,11 +790,23 @@ function createTicket(req: Request, res: Response) {
 
 };
 
+
+let every = (arr: any[], target: any[]) => target.every(v => arr.includes(v));
+let some = (arr: any[], target: any[]) => target.some(v => arr.includes(v));
+
+// let array1 = [1,2,3],
+//     array2 = [1,2,3,4],
+//     array3 = [1,2];
+// cnsole.log(checker(array2, array1)); //true
+// cnsole.log(checker(array3, array1)); //false
+
 async function validateTicket(req: any, res: Response) {
 	// WAITING -> TERMINATED || PENDING || SCHEDULED
 	const idTicket = req.body.idTicket;
 	const user = req.usuario; // inject on mdAuth
 	const server = Server.instance; // singleton
+
+
 
 	Ticket.findById(idTicket)
 		.populate('id_company')
@@ -780,7 +826,6 @@ async function validateTicket(req: any, res: Response) {
 			const txCompanyAddress = ticketWaiting.id_company.tx_address_street + ' ' + ticketWaiting.id_company.tx_address_number;
 			const cdTables = ticketWaiting.cd_tables;
 			const cdTablesStr = ticketWaiting.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-			const tmRemaining = moment(ticketWaiting.tm_reserve).fromNow();
 
 			// 2. Verifico que esté en su estado WAITING
 			if (ticketWaiting.tx_status !== 'waiting') {
@@ -823,9 +868,14 @@ async function validateTicket(req: any, res: Response) {
 				})
 			}
 
-			// 4. SOLO si el ticket tiene una mesa compatible asignada verifico que la mesa que quiere reservar todavía esté disponible.
+			// 4. SOLO si el ticket tiene una mesa compatible asignada (UNA porque se trata de asignación automática) verifico que esa mesa que quiere reservar todavía esté disponible.
 			if (ticketWaiting.cd_tables.length > 0) {
-				const ticketsTable = ticketsActiveCompany.filter(ticket => ticket.tx_status === 'scheduled' && ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) && ticket.tm_reserve?.getHours() === ticketWaiting.tm_reserve?.getHours() && ticket._id !== ticketWaiting._id)
+				const ticketsTable = ticketsActiveCompany.filter(ticket =>
+					ticket.tx_status === 'scheduled' && //un ticket agendado
+					ticket.cd_tables.includes(ticketWaiting.cd_tables[0]) &&  //para la mesa de reserva
+					ticket.tm_intervals.some(i => ticketWaiting.tm_intervals.includes(i)) && //verifico que ningún ticket tenga AL MENOS un intervalo 
+					ticket._id !== ticketWaiting._id) //que no sea el mismo ticket
+
 				if (ticketsTable && ticketsTable.length > 0) {
 					ticketWaiting.tx_platform = user.tx_platform;
 					ticketWaiting.tx_email = user.tx_email;
@@ -863,11 +913,11 @@ async function validateTicket(req: any, res: Response) {
 					response = `Reserva pendiente de aprobación`
 				}
 
-				if ((user.tx_platform === 'facebook' || user.tx_platform === 'google') && ticketSaved.tm_reserve) {
+				if ((user.tx_platform === 'facebook' || user.tx_platform === 'google') && ticketSaved.tm_intervals?.length > 0) {
 					const messageToUser = `
 Hola ${ticketWaiting.tx_name}, la reserva de ${cdTablesStr} ${cdTables} en ${txCompanyName} quedó confirmada.
 
-Te esperamos en ${tmRemaining} en ${txCompanyAddress}.
+Te esperamos en ${txCompanyAddress}.
 
 Podés ver o cancelar tus reservas haciendo click aquí:
 https://saturno.fun/public/tickets

@@ -1,6 +1,5 @@
-const CACHE_STATIC = 'static-0.8'
-const CACHE_DYNAMIC = 'dynamic-0.8'
-const CACHE_INMUTABLE = 'inmutable-0.8'
+const CACHE_SHELL = 'cache-shell-0.8'
+const CACHE_ASSETS = 'cache-assets-0.8'
 
 // ----------------------------------------------------------
 // app shell
@@ -8,21 +7,21 @@ const CACHE_INMUTABLE = 'inmutable-0.8'
 
 self.addEventListener('install', e => {
   let static = caches
-    .open(CACHE_STATIC)
+    .open(CACHE_SHELL)
     .then(cache => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
         '/2.6324d76aacfd6c927caa.js',
-        '/6.cd71526a23df078112ba.js',
-        '/7.ebfff0607e1f41b70938.js',
+        '/6.ae473d78fc4a38126dc6.js',
+        '/7.5ff5273cb8309afe13e8.js',
         '/8.e383c3caa48d52c157ef.js',
-        '/9.b39ec88f550191448828.js',
+        '/9.96f88db4207c1660b701.js',
         '/admin_schedule.314bfb77a946eb28111c.png',
         '/angular.e6ed573fa80c0dc1bf57.svg',
         '/common.e68c317f43651fb8822e.js',
         '/javascript.073149757fbeb5b24d7f.svg',
-        '/main.862469f3ce2391e025e2.js',
+        '/main.6ed47350db89a3e7e44f.js',
         '/mongodb2.e3bc88b4b82e616b0b76.svg',
         '/nodejs.615ffbea9529ca7047ed.svg',
         '/polyfills.164a7b585585bfda7685.js',
@@ -31,7 +30,7 @@ self.addEventListener('install', e => {
         '/public_scores.3357dd204cbe02fd7d91.png',
         '/public_tickets.11b7f154fb8764573190.png',
         '/resto.d59299e0fd9a646201cb.jpg',
-        '/runtime.3017799f9dfb052fb39f.js',
+        '/runtime.4baa9c7aca7e9d47e111.js',
         '/saturno-logo.a06910f315a45a70206d',
         '/styles.09a1a9b9583f681f1f7e.css',
         '/telegram.41785cbc399faf2eac6e.svg',
@@ -44,11 +43,12 @@ self.addEventListener('install', e => {
       console.log('error al crear la app shell')
     })
 
-  let inmutable = caches
-    .open(CACHE_INMUTABLE)
+  let assets = caches
+    .open(CACHE_ASSETS)
     .then(cache => {
       return cache.addAll([
         '/app.js',
+        '/offline.html',
         '/favicon.ico',
         '/manifest.json',
         '/assets/pwa.css',
@@ -69,10 +69,10 @@ self.addEventListener('install', e => {
       ])
     })
     .catch(() => {
-      console.log('error al crear el cache inmutable')
+      console.log('error al crear el cache assets')
     })
 
-  e.waitUntil(Promise.all([inmutable, static]))
+  e.waitUntil(Promise.all([assets, static]))
 })
 
 // ----------------------------------------------------------
@@ -81,9 +81,10 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   const respuesta = caches.keys().then(keys => {
     keys.forEach(key => {
-      if (key !== CACHE_STATIC && key.includes('static')) {
+      if (key !== CACHE_SHELL && key.includes('static')) {
         return caches.delete(key)
       }
+
     })
   })
   e.waitUntil(respuesta)
@@ -94,40 +95,42 @@ self.addEventListener('activate', e => {
 // ----------------------------------------------------------
 
 self.addEventListener('fetch', e => {
-  if (
-    e.request.url.includes('saturno') ||
-    e.request.url.includes('herokuapp') ||
-    e.request.url.includes('localhost')
-  ) {
-    // las peticiones GET no debe guardarlas en cache
-    const respuesta = fetch(e.request).then(resp => {
-      return resp
-    })
-    e.respondWith(respuesta)
-  } else {
-    const respuesta = caches
-      .match(e.request)
-      .then(resp => {
-        if (resp) {
-          return resp
-        }
-        return fetch(e.request).then(resp => {
-          if (e.request.method !== 'POST') {
-            caches.open(CACHE_DYNAMIC).then(cache => {
-              cache.put(e.request, resp.clone())
-            })
-          }
-          return resp.clone()
-        })
+
+  const respuesta = fetch(e.request).then(resp => {
+
+    if (!resp) {
+      // si no lo encuentra en inet intenta obtenerlo del cache
+      return caches.match(e.request);
+    }
+
+    if (e.request.method !== 'POST') {
+      caches.open(CACHE_SHELL).then(cache => {
+        cache.put(e.request, resp.clone())
       })
-      .catch(err => {
-        if (e.request.headers.get('accept').includes('text/html')) {
-          return caches.match('/offline.html')
-        }
-      })
-    e.respondWith(respuesta)
-  }
+    }
+    return resp.clone()
+
+  }).catch(() => {
+
+    if (e.request.headers.get('accept')) {
+      if (e.request.headers.get('accept').includes('text/html')) {
+        return caches.match('/offline.html')
+      }
+    }
+
+    return new Response(`
+          No hay conexión a Internet. 
+          Saturno necesita obtener información de Internet. 
+          Por favor verificá tu conexión y volver a cargar la página.
+          `);
+
+  })
+
+  e.respondWith(respuesta)
 })
+
+
+
 
 // escuchar push
 self.addEventListener('push', e => {

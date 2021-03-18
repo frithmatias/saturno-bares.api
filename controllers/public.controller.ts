@@ -195,11 +195,11 @@ function getCompaniesByCoords(req: Request, res: Response) {
   const lat: number = req.body.lat;
   const lng: number = req.body.lng;
 
-  const latFrom = Number(lat) - .02;
-  const latTo = Number(lat) + .02;
+  const latFrom = Number(lat) - .03; //3km aprox
+  const latTo = Number(lat) + .03;
 
-  const lngFrom = Number(lng) - .02;
-  const lngTo = Number(lng) + .02;
+  const lngFrom = Number(lng) - .03;
+  const lngTo = Number(lng) + .03;
 
   Company.find({
     tx_company_lat: { $gt: latFrom, $lt: latTo}, 

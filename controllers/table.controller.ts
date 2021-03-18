@@ -178,7 +178,6 @@ let toggleTableStatus = (req: Request, res: Response) => {
     })
 }
 
-
 // ADMIN 
 let resetTable = async (req: Request, res: Response) => {
     // el camarero inicializa las mesas en estado "waiting" (el cliente llegó a la mesa)
@@ -220,7 +219,6 @@ let resetTable = async (req: Request, res: Response) => {
 
 }
 
-
 // WAITER
 let initTables = async (req: Request, res: Response) => {
     // el camarero inicializa las mesas en estado "waiting" (el cliente llegó a la mesa)
@@ -257,6 +255,8 @@ let initTables = async (req: Request, res: Response) => {
         }
 
         server.io.to(section.id_company).emit('update-waiters');
+        server.io.to(section.id_company).emit('update-clients');
+
         if (ticket.id_socket_client) {
                 server.io.to(ticket.id_socket_client).emit('update-ticket', ticket);
         }
@@ -352,8 +352,14 @@ let assignTablesRequested = (req: Request, res: Response) => {
 
             //1. DES-RESERVA DES-ASIGNADAS: obtengo las mesas del ticket que no estan incluidas en cdTables (mesas nuevas)
             //en ticket [1,2,3] nuevas [3,4] obtiene [1,2]
-            const missingTables = ticketDB.cd_tables.filter(table => !cdTables.includes(table))
-            let tablesToPause = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: missingTables }, tx_status: 'reserved' });
+            const missingTables = ticketDB.cd_tables.filter(table => !cdTables.includes(table));
+
+            let tablesToPause = await Table.find({ 
+                id_section: ticketDB.id_section, 
+                nm_table: { $in: missingTables }, 
+                tx_status: 'reserved' 
+            });
+
             if (tablesToPause.length > 0) {
                 for (let table of tablesToPause) {
                     table.tx_status = 'paused';
@@ -364,7 +370,13 @@ let assignTablesRequested = (req: Request, res: Response) => {
             //2. RESERVA NUEVAS ASIGNADAS:
             //en ticket [1,2,3] nuevas [3,4] obtiene [4]
             const newTables = cdTables.filter((table: number) => !ticketDB.cd_tables.includes(table))
-            let tablesToReserve = await Table.find({ id_section: ticketDB.id_section, nm_table: { $in: newTables }, tx_status: { $ne: 'busy' } });
+            
+            let tablesToReserve = await Table.find({ 
+                id_section: ticketDB.id_section, 
+                nm_table: { $in: newTables }, 
+                tx_status: { $ne: 'busy' } 
+            });
+
             if (tablesToReserve.length > 0) {
                 for (let table of tablesToReserve) {
                     table.tx_status = 'reserved';

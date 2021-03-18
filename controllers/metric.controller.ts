@@ -87,7 +87,31 @@ function getTableSessions(req: Request, res: Response) {
         })
 }
 
+function readTickets(req: Request, res: Response) {
+
+    let { idCompany } = req.params;
+
+    Ticket.find({ id_company: idCompany }, 'tm_start tm_att tm_end tx_status')
+        .populate('id_section', 'tx_section')
+        .then(ticketsDB => {
+            return res.status(200).json({
+                ok: true,
+                msg: 'Tickets del comercio obtenidos correctamente',
+                tickets: ticketsDB
+            })
+        }).catch(() => {
+            return res.status(400).json({
+                ok: false,
+                msg: 'Error al comercio los tickets del camarero',
+                tickets: null
+            })
+        })
+}
+
+
+
 export = {
     getUserMetrics,
-    getTableSessions
+    getTableSessions,
+    readTickets
 }

@@ -149,7 +149,7 @@ function loginUser(req: Request, res: Response) {
         // ADMIN
         res.status(200).json({
           ok: true,
-          msg: "Usuario logueado correctamente",
+          msg: 'Usuario logueado correctamente',
           token: token,
           user: userDB,
           menu: await obtenerMenu(userDB.id_role),
@@ -159,7 +159,7 @@ function loginUser(req: Request, res: Response) {
       }).catch((err) => {
         return res.status(500).json({
           ok: false,
-          msg: "Error al actualizar la fecha de login",
+          msg: 'Error al actualizar la fecha de login',
           errors: err
         });
       })
@@ -237,7 +237,7 @@ async function loginSocial(req: Request, res: Response) {
 
                   res.status(200).json({
                     ok: true,
-                    msg: 'Login exitoso',
+                    msg: 'Usuario logueado correctamente',
                     token: token,
                     user: userDB,
                     menu,

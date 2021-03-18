@@ -19,7 +19,7 @@ const ticketsSchema = new Schema({
     id_socket_client: { type: String, required: false },
     id_socket_waiter: { type: String, required: false },
 
-    tm_reserve: { type: Date, required: false },
+    tm_intervals: { type: [Date], required: false, default: [] },
     tm_start: { type: Date, required: true, default: + new Date() },
     tm_init: { type: Date, required: false, default: null },
     tm_call: { type: Date, required: false, default: null },
@@ -45,7 +45,7 @@ export interface Ticket extends Document {
     id_position: number | null;
     id_socket_client: string | null;
     id_socket_waiter?: string | null;
-    tm_reserve: Date | null,
+    tm_intervals: Date[],
     tm_start: Date;
     tm_init: Date | null;
     tm_call: Date | null;
