@@ -226,7 +226,7 @@ function releaseTicket(req: Request, res: Response) {
 
 	let newStatus;
 
-	if (ticket.tm_intervals.length > 0) {
+	if (ticket.tm_intervals) {
 		newStatus = 'scheduled';
 	} else {
 		if (ticket.cd_tables) {

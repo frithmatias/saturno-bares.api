@@ -206,7 +206,7 @@ export default class Spm {
                 for (let [index, table] of tables.entries()) {
                     // La mesa puede salir del estado PAUSED y pasar a RESERVED SOLO si la mesa esta IDLE 
                     // (o si esta PAUSED pero el ticket viene de Agenda)
-                    if (table.tx_status === 'idle' || (ticket.tm_intervals.length > 0 && table.tx_status === 'paused')) {
+                    if (table.tx_status === 'idle' || (ticket.tm_intervals && table.tx_status === 'paused')) {
                         table.tx_status = 'reserved';
                         await table.save();
                     }
