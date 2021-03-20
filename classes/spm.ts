@@ -66,7 +66,6 @@ export default class Spm {
                     const respProvide = Spm.provide([idleTables[0]], ticket); 
                     resolve(respProvide);
                     return;
-
                 }
 
             }).catch(() => {
@@ -197,7 +196,7 @@ export default class Spm {
     public static provide = (tables: Table[], ticket: Ticket): Promise<string> => {
         return new Promise(async (resolve, reject) => {
 
-            // Si se trata de un asignado, tenga una o mas mesas, o sea un asignado pro agenda o por cola virtual,
+            // Si se trata de un asignado, tenga una o mas mesas, o sea un asignado por agenda o por cola virtual,
             // las mesas siempre se RESERVAN antes una por una antes de ponerlas en estado WAITING y el ticket en 
             // estado PROVIDED.
 
@@ -240,6 +239,7 @@ export default class Spm {
                         await table.save().then(async tableSaved => {
                             ticket.tx_status = 'provided';
                             ticket.id_session = tableSaved.id_session;
+                            ticket.cd_tables = tables.map(table => table.nm_table); // tickets from vqueue have NOT assigned tables yet
                             ticket.tm_provided = new Date();
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
@@ -251,7 +251,6 @@ export default class Spm {
                             }).catch(() => reject('Error guardando nuevo estado de ticket'))
                         }).catch(() => reject('Error guardando nuevo estado de mesa'))
                     }
-
                 }).catch(() => reject('Error guardando sesion de mesa'))
             }
         })
