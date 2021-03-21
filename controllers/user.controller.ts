@@ -651,10 +651,6 @@ function obtenerMenu(txRole: string) {
           tx_url: '/waiter/home',
           tx_icon: 'mdi mdi-home'
         }, {
-          tx_titulo: 'Dashboard',
-          tx_url: '/waiter/dashboard',
-          tx_icon: 'mdi mdi-monitor-dashboard'
-        }, {
           tx_titulo: 'Mi Sector',
           tx_url: '/waiter/section',
           tx_icon: 'mdi mdi-select-group'
