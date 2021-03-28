@@ -155,11 +155,9 @@ export default class Spm {
 
                     }
 
-
                     // Encontró un ticket para proveerle la mesa.
                     if (ticketToProvide) {
                         if (ticketToProvide.tx_status === 'assigned') {
-
                             // si es 'assigned' el camarero le asigno mas de una mesa, 
                             // busco TODAS las mesas en el ticket y se las paso a provide()
                             Table.find({
@@ -184,9 +182,7 @@ export default class Spm {
                         }
 
                     } else {
-
                         return resolve('No hay tickets para asignar a esta mesa')
-
                     }
 
                 })
@@ -199,7 +195,6 @@ export default class Spm {
             // Si se trata de un asignado, tenga una o mas mesas, o sea un asignado por agenda o por cola virtual,
             // las mesas siempre se RESERVAN antes una por una antes de ponerlas en estado WAITING y el ticket en 
             // estado PROVIDED.
-
             let allReserved = false;
             if (ticket.tx_status === 'assigned') {
                 for (let [index, table] of tables.entries()) {
@@ -207,12 +202,12 @@ export default class Spm {
                     // (o si esta PAUSED pero el ticket viene de Agenda)
                     if (table.tx_status === 'idle' || (ticket.tm_intervals && table.tx_status === 'paused')) {
                         table.tx_status = 'reserved';
+                        table.id_ticket = ticket._id;
                         await table.save();
                     }
                 }
             }
-
-            let tablesReservedCount = tables.filter(table => table.tx_status === 'reserved').length;
+            let tablesReservedCount = tables.filter(table => table.tx_status === 'reserved' && table.id_ticket === ticket._id.toString()).length;
 
             allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
 

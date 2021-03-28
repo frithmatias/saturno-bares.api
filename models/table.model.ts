@@ -6,7 +6,7 @@ const tableSchema = new Schema({
     nm_persons: {type: Number, min: [1, 'El mínimo valor es 1'], max: [1000, 'El mínimo valor es 1000'], required: [true, 'El nm_persons es necesario']},
     tx_status: {type: String, required: [true, 'El tx_status es necesario'], default: 'paused'}, // busy, paused, idle, reserved 
     id_session: {type: String, ref: 'TableSession', required: false, default: null},
-
+    id_ticket: {type: String, ref: 'Ticket', required: false, default: null},
 
 },{ collection: "tables" })
 
@@ -16,6 +16,7 @@ export interface Table extends Document {
     nm_persons: number;
     tx_status: string;
     id_session?: string | null;
+    id_ticket?: string | null;
 }
 
 

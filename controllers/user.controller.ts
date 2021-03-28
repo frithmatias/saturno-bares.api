@@ -217,7 +217,7 @@ async function loginSocial(req: Request, res: Response) {
               userDB.id_role = 'ADMIN_ROLE';
             }
 
-            userDB.updateOne({ tm_lastlogin: + new Date().getTime(), id_role: userDB.id_role })
+            userDB.updateOne({ tm_lastlogin: new Date(), id_role: userDB.id_role })
               .then(async userSaved => {
 
                 userSaved.tx_password = ":)";
@@ -710,19 +710,8 @@ function obtenerMenuDB(txRole: string, cdPricing: number = 0) {
   })
 }
 
-function testData(req: Request, res: Response) {
-  const animal = 'alligator';
-  // Send a text/html file back with the word 'alligator' repeated 1000 times
-  res.send(animal.repeat(1000));
-  return;
-  var user = User.findOne({ tx_email: 'matiasfrith@gmail.com' }, (err, userDB) => {
-    return res.json({ data: userDB?.getData() });
-  })
-}
-
 export = {
   activateUser,
-  testData,
   registerUser,
   attachCompany,
   checkEmailExists,

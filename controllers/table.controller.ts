@@ -58,7 +58,7 @@ let readTables = (req: Request, res: Response) => {
 
             Table.find({ id_section: { $in: idSections } })
                 .populate({
-                    path: 'id_session',
+                    path: 'id_session id_ticket',
                     populate: { path: 'id_ticket' }
                 })
                 .sort({ id_section: 1, nm_table: 1 })
@@ -338,7 +338,7 @@ let assignTablesRequested = (req: Request, res: Response) => {
             })
         }
 
-        // si des-asigno verifico las mesas del sector, si no hay compatibles queda 'requested'
+        // si des-asigno verifico las mesas del sector, si no hay compatibles el estado anterior era 'requested'
         let tables = await Table.find({ id_section: ticketDB.id_section })
         let compatibles = tables.filter(table => table.nm_persons >= ticketDB.nm_persons);
         let newStatus;
@@ -357,7 +357,8 @@ let assignTablesRequested = (req: Request, res: Response) => {
             let tablesToPause = await Table.find({ 
                 id_section: ticketDB.id_section, 
                 nm_table: { $in: missingTables }, 
-                tx_status: 'reserved' 
+                tx_status: 'reserved',
+                id_ticket: idTicket 
             });
 
             if (tablesToPause.length > 0) {
@@ -374,12 +375,13 @@ let assignTablesRequested = (req: Request, res: Response) => {
             let tablesToReserve = await Table.find({ 
                 id_section: ticketDB.id_section, 
                 nm_table: { $in: newTables }, 
-                tx_status: { $ne: 'busy' } 
+                tx_status: { $nin: ['busy', 'waiting'] } 
             });
 
             if (tablesToReserve.length > 0) {
                 for (let table of tablesToReserve) {
                     table.tx_status = 'reserved';
+                    table.id_ticket = idTicket 
                     await table.save();
                 }
             }

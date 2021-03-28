@@ -14,7 +14,7 @@ import Mail from '../classes/mail';
 
 // run cron
 cron.schedule('*/10 * * * * *', () => {
-	checkScheduled();
+	checkTickets();
 })
 
 // set moment locales
@@ -47,59 +47,34 @@ interface avData {
 // system methods
 // ========================================================
 
-async function checkScheduled() {
+async function checkTickets() {
 	const server = Server.instance; // singleton
 
-	let scheduledTickets: Ticket[] = [];
-
 	// at least 1 element should exist
-	await Ticket.find({ 'tm_intervals.0': { $exists: true }, tm_provided: null, tm_end: null })
-		.populate('id_company')
-		.then(data => {
-			scheduledTickets = data;
-		}).catch(() => {
-		})
-
-	let waiting = scheduledTickets.filter(ticket => ticket.tx_status === 'waiting');
-	let pending = scheduledTickets.filter(ticket => ticket.tx_status === 'pending');
-	let scheduled = scheduledTickets.filter(ticket => ticket.tx_status === 'scheduled');
-	let assigned = scheduledTickets.filter(ticket => ticket.tx_status === 'assigned');
+	// Con TM_INTERVALS.0 sólo voy a manejar los tickets con intervalos, es decir los que entraron por AGENDA. 
+	let tickets: Ticket[] = await Ticket.find({ 'tm_intervals.0': { $exists: true }, tm_end: null }).populate('id_company');
+	let waiting = tickets.filter(ticket => ticket.tx_status === 'waiting');
+	let pending = tickets.filter(ticket => ticket.tx_status === 'pending');
+	let scheduled = tickets.filter(ticket => ticket.tx_status === 'scheduled');
+	let assigned = tickets.filter(ticket => ticket.tx_status === 'assigned'); 
+	let provided = tickets.filter(ticket => ticket.tx_status === 'provided');
 
 	console.log({
 		'waiting': waiting.length,
 		'pending': pending.length,
 		'scheduled': scheduled.length,
 		'assigned': assigned.length,
+		'provided': provided.length,
 	});
 
-	for (let ticket of scheduledTickets) {
-
-		if (ticket.tm_intervals.length === 0) {
-			continue;
-		}
-
-		// relative reservetion time from now to define event
-		const now = +new Date().getTime();
-		const timeToProvide = (ticket.tm_intervals[0]?.getTime() - now) <= 0;
-		const timeToReserve = (ticket.tm_intervals[0]?.getTime() - now) <= 2 * 60 * 60 * 1000; // 2hrs
-		const timeToTerminate = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // 10 minutes 
-
-		// company and reservation data for email pourposes
-		const txPlatform = ticket.tx_platform;
-		const txEmail = ticket.tx_email;
-		const txName = ticket.tx_name;
-		const txCompanyName = ticket.id_company.tx_company_name;
-		const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
-		const cdTables = ticket.cd_tables;
-		const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-
-
+	for (let ticket of waiting) {
+		const now = +new Date();
+		const ttt = (now - ticket.tm_start?.getTime()) >= 10 * 60 * 1000; // Time To Terminate Waiting Tickets 10 minutes 
 		// -------------------------------------------------------------
-		// AFTER 10MIN OF TM_START: IF NOT CONFIRMED SET 'TERMINATED' W/ TM_END	
+		// TTK: TIME-TO-KILL AFTER 10MIN OF TM_START WO/ CONFIRMATION SET TO 'KILL'	
 		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'waiting' && timeToTerminate) {
-			ticket.tx_status = 'terminated';
+		if (ttt) {
+			ticket.tx_status = 'killed';
 			ticket.tm_end = new Date();
 			await ticket.save().then((ticketSaved) => {
 				server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
@@ -107,12 +82,28 @@ async function checkScheduled() {
 				if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
 			})
 		}
+	}
+
+	for (let ticket of scheduled) {
+		// relative reservetion time from now to define event
+		const now = +new Date();
+		const ttr = (ticket.tm_intervals[0]?.getTime() - now) <= 90 * 60 * 1000; // Time To Reserve 1:30hs (3 intervals)
+		const ttf = (ticket.tm_intervals[0]?.getTime() - now) <= 20 * 60 * 1000; // Time To Force Reserve 0:20hs (20 min)
 
 		// -------------------------------------------------------------
-		// BEFORE 2HS AT TM_RESERVE: RESERVE TABLES AND ASSIGN TO TICKET
+		// TTR: TIME-TO-RESERVE BEFORE 1:30HS AT TM_INTERVALS[0] RESERVE TABLES (IF NOT BUSY) AND ASSIGN TO TICKET
+		// TTF: TIME-TO-FORCE-RESERVE BEFORE 0:20HS AT TM_INTERVALS[0] RESERVE TABLES (ANY STATUS) AND ASSIGN TO TICKET
 		// -------------------------------------------------------------
+		if (ttr || ttf) {
+			// company and reservation data for email pourposes
+			const txPlatform = ticket.tx_platform;
+			const txEmail = ticket.tx_email;
+			const txName = ticket.tx_name;
+			const txCompanyName = ticket.id_company.tx_company_name;
+			const txCompanyAddress = ticket.id_company.tx_address_street + ' ' + ticket.id_company.tx_address_number;
+			const cdTables = ticket.cd_tables;
+			const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
 
-		if (ticket.tx_status === 'scheduled' && timeToReserve) {
 			await Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } })
 				.then(async tablesToReserve => {
 
@@ -120,25 +111,35 @@ async function checkScheduled() {
 						return;
 					}
 
-					// TABLES -> RESERVED
-					// CRON 2HRS LEFT: asignando ticket y reservando mesas... 
 					let allReserved = false;
 					for (let [index, table] of tablesToReserve.entries()) {
-						if (table.tx_status === 'idle' || table.tx_status === 'paused') {
+						if (ttf || table.tx_status === 'idle' || table.tx_status === 'paused') {
+							table.id_session = null;
 							table.tx_status = 'reserved';
+							table.id_ticket = ticket._id;
 							await table.save().then(() => {
 								server.io.to(ticket.id_company._id).emit('update-waiters');
 								server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 							})
+
+							// finalizo la sesión de mesa de la mesa que estoy forzando a finalizar y su ticket
+							if (ttf) {
+								const session = await TableSession.findByIdAndUpdate(table.id_session, { tm_end: new Date() });
+								const ticket = await Ticket.findByIdAndUpdate(session?.id_ticket, { tm_end: new Date(), tx_status: 'terminated' }, { new: true });
+								if (ticket?.id_socket_client) {
+									server.io.to(ticket.id_socket_client).emit('update-ticket', ticket);
+								}
+							}
+
 						}
 					}
-
-					let tablesReservedCount = tablesToReserve.filter(table => table.tx_status === 'reserved').length;
+					// obtengo las el total de mesas reservadas para el ticket
+					let tablesReservedCount = tablesToReserve.filter(table => table.tx_status === 'reserved' && table.id_ticket === ticket._id.toString()).length;
 					allReserved = tablesReservedCount === ticket.cd_tables?.length ? true : false;
 
 					// si todas las mesas quedaron reservadas dejo el ticket en estado ASSIGNED
 					if (allReserved) {
-						// TICKET -> ASSIGNED
+
 						ticket.tx_status = 'assigned';
 						await ticket.save().then((ticketSaved: Ticket) => {
 
@@ -156,40 +157,59 @@ Saturno.fun`;
 								Mail.sendMail('reservas', txEmail, messageToUser);
 							}
 
-							// CRON 2HRS LEFT: Se reservaron correctamente todas las mesas asignadas al cliente.
 							if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticketSaved); }
 						})
 					}
 				})
-
 		}
+	}
 
+	for (let ticket of assigned) {
+		const now = +new Date();
+		const ttp = (ticket.tm_intervals[0]?.getTime() - now) <= 0; // Time To Provide (o'clock)
 		// -------------------------------------------------------------
-		// IN TIME: PROVIDE TABLES	
+		// TTP: TIME-TO-PROVIDE: PROVIDE TABLES	
 		// -------------------------------------------------------------
-
-		if (ticket.tx_status === 'assigned' && timeToProvide) {
+		if (ttp) {
 			Table.find({ id_section: ticket.id_section, nm_table: { $in: ticket.cd_tables } }).then(tablesToProvide => {
-
 				if (!tablesToProvide) {
 					return;
 				}
-
 				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
 				spm.provide(tablesToProvide, ticket).then(data => {
 					server.io.to(ticket.id_company._id).emit('update-admin'); // schedule update
 					server.io.to(ticket.id_company._id).emit('update-waiters');
 				})
-
 			})
 		}
-
-
-
-
 	}
 
+	for (let ticket of provided) {
+		const now = +new Date();
+		if (!ticket.tm_provided) continue;
+		const ttk = now - ticket.tm_provided.getTime() >= 3 * 60 * 60 * 1000; // Time To Kill 3Hrs after provide
+		// -------------------------------------------------------------
+		// TTK: TIME-TO-KILL: KILL TICKETS AFTER 3HRS FROM TM_PROVIDE	
+		// -------------------------------------------------------------
+		if (ttk) {
+			const session = await TableSession.findByIdAndUpdate(ticket.id_session, { tm_end: new Date() });
+			if (!session) return;
+			for (let table of session?.id_tables) {
+				await Table.findById(table).then(tableDB => {
+					if (!tableDB) return;
+					tableDB.id_session = null;
+					tableDB.tx_status = 'paused';
+					tableDB?.save()
+				})
+			}
+			const ticketUpdated = await Ticket.findByIdAndUpdate(session?.id_ticket, { tm_end: new Date(), tx_status: 'terminated' }, { new: true });
 
+			server.io.to(ticket.id_company._id).emit('update-waiters');
+			if (ticketUpdated?.id_socket_client) {
+				server.io.to(ticketUpdated.id_socket_client).emit('update-ticket', ticketUpdated);
+			}
+		}
+	}
 };
 
 // ========================================================
@@ -203,7 +223,7 @@ function attendedTicket(req: Request, res: Response) {
 	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null }, { new: true }).then(ticketAttended => {
 		if (ticketAttended) {
 			server.io.to(ticketAttended.id_company).emit('update-waiters');
-			if (ticketAttended.id_socket_client) { server.io.to(ticketAttended.id_socket_client).emit('update-clients'); }
+			server.io.to(ticketAttended.id_company).emit('update-clients');
 			return res.status(200).json({
 				ok: true,
 				msg: 'El llamado al camarero fue atendido.',
@@ -333,7 +353,7 @@ async function endTicket(req: Request, res: Response) {
 
 					// en una sesión de mesa puedo tener asignadas una o mas mesas
 					for (let idTable of sessionCanceled?.id_tables) {
-						await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_session: null });
+						await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_ticket: null, id_session: null });
 					}
 
 
@@ -400,7 +420,7 @@ async function readAvailability(req: Request, res: Response) {
 	let compatibleTables: number[] = []; // ie. [2,3,5,8] -> only compatible tables
 	let sectionTables: number[] = []; // all tables numbers
 	let sectionTablesFull: avData[] = [];  // all tables numbers and persons
-	let scheduledTickets: Ticket[] = []; // tickets agendados para el día seleccionado y que tengan mesas compatibles asignadas
+	let tickets: Ticket[] = []; // tickets agendados para el día seleccionado y que tengan mesas compatibles asignadas
 	let availability: availability[] = []; // return availability
 
 	// -----------------------------------
@@ -452,7 +472,7 @@ async function readAvailability(req: Request, res: Response) {
 			'tm_intervals.0': { $gte: dayStart, $lt: dayEnd },
 			cd_tables: { $in: compatibleTables }
 		}).then(resp => {
-			scheduledTickets = resp
+			tickets = resp
 		}).catch(() => {
 			return res.status(500).json({
 				ok: false,
@@ -467,7 +487,7 @@ async function readAvailability(req: Request, res: Response) {
 			tx_status: { $in: ['scheduled', 'waiting'] },
 			'tm_intervals.0': { $gte: dayStart, $lt: dayEnd }
 		}).then(resp => {
-			scheduledTickets = resp
+			tickets = resp
 		}).catch(() => {
 			return res.status(500).json({
 				ok: false,
@@ -495,28 +515,33 @@ async function readAvailability(req: Request, res: Response) {
 	}
 
 	for (let [index, interval] of intervals.entries()) {
+
+		// obtengo UTC del intervalo
+		const interval_code = interval.getUTCHours() * 100 + interval.getMinutes();
+
+		if (!workingIntervals.includes(interval_code)) {
+			continue;
+		}
+
 		// obtengo todas las mesas disponibles/comatibles y a partir de la disponibilidad resto las reservadas para cada intervalo
 		let availableTables: number[] = compatibleTables.length > 0 ? compatibleTables : sectionTables;
 
-		// obtengo UTC del intervalo
-		let ThisInterval: Date = interval;
-		const interval_code = ThisInterval.getUTCHours() * 100 + ThisInterval.getMinutes();
 		if (!workingIntervals.includes(interval_code)) {
 			//continue; // omit just this loop
 		}
 
 		// TABLES RESERVED PREVIOUS INTERVAL
-		let PrevInterval: Date = index === 0 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() - 1 , 30, 0, 0)) : intervals[index - 1];
-		let PrevTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === PrevInterval.getTime()));
+		let PrevInterval: Date = index === 0 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() - 1, 30, 0, 0)) : intervals[index - 1];
+		let PrevTickets: Ticket[] = tickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === PrevInterval.getTime()));
 		let PrevTables: number[] = [];
-		for ( let ticket of PrevTickets) {
-			for ( let table of ticket.cd_tables) {
+		for (let ticket of PrevTickets) {
+			for (let table of ticket.cd_tables) {
 				PrevTables.push(table);
 			}
 		}
-		
+
 		// TABLES RESERVED THIS INTERVAL
-		let ThisTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === ThisInterval.getTime()));
+		let ThisTickets: Ticket[] = tickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === interval.getTime()));
 		let ThisTables: number[] = [];
 		for (let ticket of ThisTickets) {
 			for (let table of ticket.cd_tables) {
@@ -525,18 +550,18 @@ async function readAvailability(req: Request, res: Response) {
 		}
 
 		// TABLES RESERVED NEXT INTERVAL
-		let NextInterval: Date = index === 47 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() + 24 , 0, 0, 0)) : intervals[index + 1];
-		let NextTickets: Ticket[] = scheduledTickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === NextInterval.getTime()));
+		let NextInterval: Date = index === 47 ? new Date(intervalUTCdate.setUTCHours(dayStart.getUTCHours() + 24, 0, 0, 0)) : intervals[index + 1];
+		let NextTickets: Ticket[] = tickets.filter(ticket => !!ticket.tm_intervals.find(d => d.getTime() === NextInterval.getTime()));
 		let NextTables: number[] = [];
-		for ( let ticket of NextTickets) {
-			for ( let table of ticket.cd_tables) {
+		for (let ticket of NextTickets) {
+			for (let table of ticket.cd_tables) {
 				NextTables.push(table);
 			}
 		}
 
-		for(let table of sectionTables){
-			if (ThisTables.includes(table) || 
-			(!ThisTables.includes(table) && (PrevTables.includes(table) || NextTables.includes(table)))) {
+		for (let table of sectionTables) {
+			if (ThisTables.includes(table) ||
+				(!ThisTables.includes(table) && (PrevTables.includes(table) || NextTables.includes(table)))) {
 				availableTables = availableTables.filter(nm => nm != table);
 			}
 		}
@@ -557,7 +582,7 @@ async function readAvailability(req: Request, res: Response) {
 		if (compatibleTables.length > 0) {
 			// si después del filtro quedaron mesas compatibles, entonces ofrece las mesas compatibles
 			availability.push({
-				interval: ThisInterval,
+				interval: interval,
 				compatible: availableTables,
 				available: null,
 				capacity: null
@@ -587,7 +612,7 @@ async function readAvailability(req: Request, res: Response) {
 			}
 
 			availability.push({
-				interval: ThisInterval,
+				interval: interval,
 				compatible: [],
 				available: fullTablesData,
 				capacity
@@ -598,7 +623,8 @@ async function readAvailability(req: Request, res: Response) {
 	return res.status(200).json({
 		ok: true,
 		msg: 'Disponibilidad obtenida correctamente',
-		availability
+		availability,
+		compatible: compatibleTables.length > 0 ? true : false
 	})
 }
 
@@ -653,7 +679,7 @@ function createTicket(req: Request, res: Response) {
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
-	
+
 	Section.findById(idSection).then(async (sectionDB) => {
 
 		if (!sectionDB) {
@@ -663,7 +689,7 @@ function createTicket(req: Request, res: Response) {
 				ticket: null
 			})
 		}
-		
+
 		let idPosition: Number | null = null;
 
 		// si no es reserva, entonces es espontáneo y calculo la posición en la cola virtual
@@ -801,8 +827,6 @@ async function validateTicket(req: any, res: Response) {
 	const user = req.usuario; // inject on mdAuth
 	const server = Server.instance; // singleton
 
-
-
 	Ticket.findById(idTicket)
 		.populate('id_company')
 		.then(async (ticketWaiting) => {
@@ -838,7 +862,7 @@ async function validateTicket(req: any, res: Response) {
 				// tx_platform: txPlatform,
 				// tx_email: txEmail,
 				id_section: ticketWaiting.id_section,
-				tx_status: { $nin: ['cancelled', 'finished', 'terminated'] },
+				tx_status: { $nin: ['cancelled', 'finished', 'killed', 'terminated'] },
 				id_company: ticketWaiting?.id_company._id,
 				tm_end: null
 			}).then((ticketsActiveCompany: Ticket[]) => {
@@ -851,7 +875,7 @@ async function validateTicket(req: any, res: Response) {
 				server.io.to(ticketWaiting.id_company._id).emit('update-admin'); // schedule update
 				ticketWaiting.tx_platform = user.tx_platform;
 				ticketWaiting.tx_email = user.tx_email;
-				ticketWaiting.tx_status = 'terminated';
+				ticketWaiting.tx_status = 'killed';
 				ticketWaiting.tm_end = new Date();
 				return await ticketWaiting.save().then((ticketSaved: Ticket) => {
 					if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
@@ -874,7 +898,7 @@ async function validateTicket(req: any, res: Response) {
 				if (ticketsTable && ticketsTable.length > 0) {
 					ticketWaiting.tx_platform = user.tx_platform;
 					ticketWaiting.tx_email = user.tx_email;
-					ticketWaiting.tx_status = 'terminated';
+					ticketWaiting.tx_status = 'killed';
 					ticketWaiting.tm_end = new Date();
 					return await ticketWaiting.save().then((ticketSaved: Ticket) => {
 						if (ticketWaiting.id_socket_client) { server.io.to(ticketWaiting.id_socket_client).emit('update-ticket', ticketSaved); }
