@@ -183,7 +183,7 @@ let resetTable = async (req: Request, res: Response) => {
     // el camarero inicializa las mesas en estado "waiting" (el cliente llegó a la mesa)
     let idTable = req.body.idTable;
 
-    await Table.findByIdAndUpdate(idTable, {tx_status: 'paused', id_session: null}).then(async tableUpdated => {
+    await Table.findByIdAndUpdate(idTable, {tx_status: 'paused', id_ticket: null, id_session: null}).then(async tableUpdated => {
 
         if (!tableUpdated) {
             return res.status(400).json({
