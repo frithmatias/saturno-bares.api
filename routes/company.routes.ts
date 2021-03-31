@@ -15,6 +15,9 @@ companyRoutes.put('/updatewebpage/:idCompany', mdAuth.verificaToken, CompanyCont
 companyRoutes.get('/readcompanies/:idUser', CompanyController.readCompanies);
 companyRoutes.get('/readcompany/:txCompanyString', CompanyController.readCompany);
 companyRoutes.get('/findcompany/:pattern', CompanyController.findCompany);
+companyRoutes.get('/readcovers', CompanyController.readCovers);
+companyRoutes.post('/updatecover', CompanyController.updateCover);
+
 companyRoutes.post('/checkcompanyexists', CompanyController.checkCompanyExists);
 companyRoutes.delete('/deletecompany/:idCompany', mdAuth.verificaToken, CompanyController.deleteCompany);
 

@@ -23,7 +23,7 @@ async function uploadImagen(req: any, res: Response) {
     var idField = req.params.idField;
     var idDocument = req.params.idDocument;
 
-    var idFieldsValid = ["tx_company_banners", "tx_company_logo", "tx_img"];
+    var idFieldsValid = ["tx_company_images", "tx_company_cover", "tx_company_logo", "tx_img"];
 
     if (!idFieldsValid.includes(idField)) {
         return res.status(400).json({
@@ -112,7 +112,7 @@ function deleteImagen(req: Request, res: Response) {
 
     // update filelds in COMPANY collection
 
-    if (['tx_company_banners', 'tx_company_logo'].includes(idField)) {
+    if (['tx_company_images', 'tx_company_cover', 'tx_company_logo'].includes(idField)) {
         Company.findById(idDocument).then(companyDB => {
 
             if (!companyDB) {
@@ -128,13 +128,18 @@ function deleteImagen(req: Request, res: Response) {
             var dirPath = `../uploads/${idDocument}/${idField}`;
             var completePath = path.resolve(__dirname, '../', dirPath);
 
-            if (idField === 'tx_company_banners') {
+            if (idField === 'tx_company_images') {
                 if (fileName === 'todas') {
-                    companyDB.tx_company_banners = [];
+                    companyDB.tx_company_images = [];
                 } else {
-                    companyDB.tx_company_banners = companyDB.tx_company_banners.filter(archivo => archivo != fileName);
+                    companyDB.tx_company_images = companyDB.tx_company_images.filter(archivo => archivo != fileName);
                 }
-                fileSystem.syncFolder(dirPath, companyDB.tx_company_banners);
+                fileSystem.syncFolder(dirPath, companyDB.tx_company_images);
+            }
+
+            if (idField === 'tx_company_cover') {
+                companyDB.tx_company_cover = null;
+                fileSystem.syncFolder(dirPath, []);
             }
 
             if (idField === 'tx_company_logo') {
@@ -210,7 +215,7 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
     return new Promise((resolve, reject) => {
 
         // Company collection
-        if (['tx_company_banners', 'tx_company_logo'].includes(idField)) {
+        if (['tx_company_images', 'tx_company_cover', 'tx_company_logo'].includes(idField)) {
             Company.findById(idDocument).then(companyDB => {
 
                 if (!companyDB) {
@@ -221,16 +226,20 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
                     });
                 }
 
-                if (idField === 'tx_company_banners') {
+                if (idField === 'tx_company_images') {
                     let imagenesPermitidas = 12;
-                    if (companyDB.tx_company_banners.length >= imagenesPermitidas) {
+                    if (companyDB.tx_company_images.length >= imagenesPermitidas) {
                         return reject({
                             ok: false,
                             msg: `Supera el máximo de ${imagenesPermitidas} imagenes permitidas`,
                             filename: fileName
                         });
                     }
-                    companyDB.tx_company_banners.push(fileName);
+                    companyDB.tx_company_images.push(fileName);
+                }
+
+                if (idField === 'tx_company_cover') {
+                    companyDB.tx_company_cover = fileName;
                 }
 
                 if (idField === 'tx_company_logo') {

@@ -126,6 +126,53 @@ function readCompanies(req: Request, res: Response) {
   })
 }
 
+function readCovers(req: Request, res: Response) {
+
+  const covers: any[] = [
+    { name: 'Pizza', filename: 'cover-pizza.jpg' },
+    { name: 'Vegan', filename: 'cover-vegan.jpg' },
+    { name: 'Coffee', filename: 'cover-coffee.jpg' },
+    { name: 'Coffee 2', filename: 'cover-coffee2.jpg' },
+    { name: 'Beer', filename: 'cover-beer.jpg' },
+    { name: 'Guiness', filename: 'cover-guiness.jpg' },
+
+
+
+  ]
+
+  return res.status(200).json({
+    ok: true,
+    msg: 'Se obtuvieron las imagenes predefinidas correctamente',
+    covers
+  })
+
+}
+
+function updateCover(req: Request, res: Response) {
+
+  const idCompany = req.body.idCompany;
+  const coverFilename = req.body.coverFilename;
+  
+  Company.findByIdAndUpdate(idCompany, {tx_company_cover: coverFilename}, {new: true}).then(companyDB => {
+
+    if(!companyDB){
+      return res.status(400).json({
+        ok: false,
+        msg: 'No existe el comercio para el cual desesa guardar la portada',
+        company: null
+      })
+    }
+
+    return res.status(200).json({
+      ok: true,
+      msg: 'La portada fue actualizada correctamente',
+      company: companyDB 
+    })
+
+  })
+
+}
+
 function findCompany(req: Request, res: Response) {
 
   var pattern = String(req.params.pattern);
@@ -302,6 +349,8 @@ function checkCompanyExists(req: Request, res: Response) {
 export = {
   createCompany,
   readCompany,
+  readCovers,
+  updateCover,
   readCompanies,
   findCompany,
   updateCompany,

@@ -34,8 +34,9 @@ var valdTypes = {
     tx_company_welcome: { type: String, default: '' },
 
     // uploader
-    tx_company_logo: { type: String, required: false }, // busy, paused, idle, reserved 
-    tx_company_banners: { type: [String], default: [] }, // busy, paused, idle, reserved 
+    tx_company_logo: { type: String, required: false }, 
+    tx_company_cover: { type: String, required: false }, 
+    tx_company_images: { type: [String], default: [] }, 
 
     // todo
     tm_start: { type: Date, required: false },
@@ -61,7 +62,8 @@ interface Company extends Document {
     tx_instagram: string;
     tx_company_welcome: string;
     tx_company_logo: string | null;
-    tx_company_banners: string[];
+    tx_company_cover: string | null;
+    tx_company_images: string[];
     tm_start: Date;
     tm_end: Date;
 }

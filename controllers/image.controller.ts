@@ -9,15 +9,28 @@ async function getImage(req: Request, res: Response) {
     var idCompany = req.params.idCompany;
     var idType = req.params.idType;
     var idFile = req.params.idFile;
-    var pathImage = path.resolve(__dirname, `../uploads/${idCompany}/${idType}/${idFile}`);
+
+    if(idCompany === 'predefined'){
+        var pathImage = path.resolve(__dirname, `../../assets/img/${idType}/${idFile}`);
+    } else {
+        var pathImage = path.resolve(__dirname, `../uploads/${idCompany}/${idType}/${idFile}`);
+    }
 
     if (fs.existsSync(pathImage)) {
         res.sendFile(pathImage);
     } else {
-
-        var pathNoImage = path.resolve(__dirname, '../../assets/img/no-img.jpg');
+        switch (idType) {
+            case 'tx_company_logo':
+                var pathNoImage = path.resolve(__dirname, '../../assets/img/default/default-logo.jpg');
+                break;
+            case 'tx_company_cover':
+                var pathNoImage = path.resolve(__dirname, '../../assets/img/default/default-cover.jpg');
+                break;
+            default:
+                var pathNoImage = path.resolve(__dirname, '../../assets/img/default/default-image.jpg');
+                break;
+        }
         res.sendFile(pathNoImage);
-
 
         // downloadHTTP(idCompany, idType, idFile).then(() => {
         //     if (fs.existsSync(pathImage)) {
