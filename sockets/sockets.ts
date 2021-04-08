@@ -2,7 +2,7 @@ import { Socket } from 'socket.io';
 import socketIO from 'socket.io';
 
 // Borrar marcador
-export const escucharMensajes = (cliente: Socket, io: socketIO.Server) => {
+export const clientConnected = (cliente: Socket, io: socketIO.Server) => {
 	cliente.on('enterCompany', (idCompany) => {
 		cliente.join(idCompany);
 		console.log('System: ', cliente.id, ' entrando a ', idCompany);

@@ -53,7 +53,7 @@ export default class Server {
 		
 		console.log('System: Escuchando conexiones de sockets en el puerto ', this.port);
 		this.io.on('connection', (cliente) => {
-			socket.escucharMensajes(cliente, this.io);
+			socket.clientConnected(cliente, this.io);
 		});
 	}
 

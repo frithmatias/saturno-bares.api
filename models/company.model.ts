@@ -37,10 +37,7 @@ var valdTypes = {
     tx_company_logo: { type: String, required: false }, 
     tx_company_cover: { type: String, required: false }, 
     tx_company_images: { type: [String], default: [] }, 
-
-    // todo
-    tm_start: { type: Date, required: false },
-    tm_end: { type: Date, required: false },
+    tx_theme: { type: String, required: false}
 }, { collection: "companies" })
 
 interface Company extends Document {
@@ -64,8 +61,7 @@ interface Company extends Document {
     tx_company_logo: string | null;
     tx_company_cover: string | null;
     tx_company_images: string[];
-    tm_start: Date;
-    tm_end: Date;
+    tx_theme: string;
 }
 
 companySchema.plugin(uniqueValidator, { message: 'El campo {PATH} debe de ser unico' });

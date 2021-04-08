@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 // MIDDLEWARES
-import  mdAuth  from '../middlewares/auth';
+import mdAuth from '../middlewares/auth';
 
 // CONTROLLER
 import CompanyController from '../controllers/company.controller';
@@ -15,8 +15,10 @@ companyRoutes.put('/updatewebpage/:idCompany', mdAuth.verificaToken, CompanyCont
 companyRoutes.get('/readcompanies/:idUser', CompanyController.readCompanies);
 companyRoutes.get('/readcompany/:txCompanyString', CompanyController.readCompany);
 companyRoutes.get('/findcompany/:pattern', CompanyController.findCompany);
-companyRoutes.get('/readcovers', CompanyController.readCovers);
-companyRoutes.post('/updatecover', CompanyController.updateCover);
+companyRoutes.get('/readcovers', mdAuth.verificaToken, CompanyController.readCovers);
+companyRoutes.post('/updatecover', mdAuth.verificaToken, CompanyController.updateCover);
+companyRoutes.post('/updatetheme', mdAuth.verificaToken, CompanyController.updateTheme);
+
 
 companyRoutes.post('/checkcompanyexists', CompanyController.checkCompanyExists);
 companyRoutes.delete('/deletecompany/:idCompany', mdAuth.verificaToken, CompanyController.deleteCompany);

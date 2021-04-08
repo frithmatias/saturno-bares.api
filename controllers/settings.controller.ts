@@ -26,6 +26,7 @@ function updateSettings(req: Request, res: Response) {
     const blSchedule = req.body.bl_schedule;
     const blQueue = req.body.bl_queue;
     const tmWorking = req.body.tm_working;
+    const nmIntervals = req.body.nm_intervals;
 
     Settings.findById(idSettings).then(companySettings => {
 
@@ -42,7 +43,8 @@ function updateSettings(req: Request, res: Response) {
         companySettings.bl_schedule = blSchedule; 
         companySettings.bl_queue = blQueue; 
         companySettings.tm_working = tmWorking; 
-
+        companySettings.nm_intervals = nmIntervals;
+        
         companySettings.save().then(settingsUpdated => {
 
             return res.status(200).json({

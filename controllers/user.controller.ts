@@ -586,18 +586,20 @@ function obtenerMenu(txRole: string) {
           tx_url: '/admin/home',
           tx_icon: 'mdi mdi-home'
         }, {
+          tx_titulo: 'Configuraciones',
+          tx_icon: 'mdi mdi-cog',
           subitems: [{
             tx_titulo: 'Mensajería',
             tx_url: '/admin/messages',
             tx_icon: 'mdi mdi-message'
           }, {
-            tx_titulo: 'Módulos',
-            tx_url: '/admin/modules',
-            tx_icon: 'mdi mdi-view-module'
+            tx_titulo: 'Ajustes',
+            tx_url: '/admin/settings',
+            tx_icon: 'mdi mdi-tune'
           }, {
             tx_titulo: 'Días y Horarios',
             tx_url: '/admin/working',
-            tx_icon: 'mdi mdi-clock-check-outline'
+            tx_icon: 'mdi mdi-timelapse'
           }, {
             tx_titulo: 'Comercios',
             tx_url: '/admin/companies',
@@ -618,9 +620,7 @@ function obtenerMenu(txRole: string) {
             tx_titulo: 'Camareros',
             tx_url: '/admin/waiters',
             tx_icon: 'mdi mdi-account-tie'
-          }],
-          tx_titulo: 'Ajustes',
-          tx_icon: 'mdi mdi-cog'
+          }]
         }, {
           tx_titulo: 'Agenda',
           tx_url: '/admin/schedule',

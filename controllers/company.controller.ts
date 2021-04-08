@@ -131,13 +131,10 @@ function readCovers(req: Request, res: Response) {
   const covers: any[] = [
     { name: 'Pizza', filename: 'cover-pizza.jpg' },
     { name: 'Vegan', filename: 'cover-vegan.jpg' },
+    { name: 'Cake', filename: 'cover-cake.jpg' },
     { name: 'Coffee', filename: 'cover-coffee.jpg' },
-    { name: 'Coffee 2', filename: 'cover-coffee2.jpg' },
     { name: 'Beer', filename: 'cover-beer.jpg' },
-    { name: 'Guiness', filename: 'cover-guiness.jpg' },
-
-
-
+    { name: 'Barbeque', filename: 'cover-barbeque.jpg' },
   ]
 
   return res.status(200).json({
@@ -166,6 +163,31 @@ function updateCover(req: Request, res: Response) {
     return res.status(200).json({
       ok: true,
       msg: 'La portada fue actualizada correctamente',
+      company: companyDB 
+    })
+
+  })
+
+}
+
+function updateTheme(req: Request, res: Response) {
+
+  const idCompany = req.body.idCompany;
+  const themeFilename = req.body.themeFilename;
+  
+  Company.findByIdAndUpdate(idCompany, {tx_theme: themeFilename}, {new: true}).then(companyDB => {
+
+    if(!companyDB){
+      return res.status(400).json({
+        ok: false,
+        msg: 'No existe el comercio para el cual desesa guardar el tema',
+        company: null
+      })
+    }
+
+    return res.status(200).json({
+      ok: true,
+      msg: 'El tema fue actualizado correctamente',
       company: companyDB 
     })
 
@@ -349,12 +371,13 @@ function checkCompanyExists(req: Request, res: Response) {
 export = {
   createCompany,
   readCompany,
-  readCovers,
-  updateCover,
   readCompanies,
   findCompany,
   updateCompany,
   updateWebPage,
+  updateTheme,
+  readCovers,
+  updateCover,
   deleteCompany,
   checkCompanyExists
 }

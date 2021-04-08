@@ -56,6 +56,7 @@ async function checkTickets() {
 	// Con TM_INTERVALS.0 sólo voy a manejar los tickets con intervalos, es decir los que entraron por AGENDA. 
 	// 'tm_intervals.0': { $exists: true },
 	let tickets: Ticket[] = await Ticket.find({ tm_end: null }).populate('id_company');
+
 	let waiting = tickets.filter(ticket => ticket.tx_status === 'waiting');
 	let pending = tickets.filter(ticket => ticket.tx_status === 'pending');
 	let scheduled = tickets.filter(ticket => ticket.tx_status === 'scheduled');
@@ -242,13 +243,13 @@ Saturno.fun`;
 	// -------------------------------------------------------------
 
 	for (let ticket of provided) {
-		const now = +new Date();
+		
 		if (!ticket.tm_provided) continue;
-
-
+		
 		// If then the customer is in the table, table was initialized and the ticket has tm_init, then the threshold is 3hrs.
 		// If the customer did not arrive at the table, the ticket is killed in 30 minutes. 
 
+		const now = +new Date();
 		const threshold: number = ticket.tm_init ? 3 * 60 * 60 * 1000 : 30 * 60 * 1000;
 		const ttt = now - ticket.tm_provided.getTime() >= threshold;
 
@@ -308,7 +309,7 @@ function attendedTicket(req: Request, res: Response) {
 function releaseTicket(req: Request, res: Response) {
 
 	const ticket: Ticket = req.body.ticket;
-	const server = Server.instance; // singleton
+	const server = Server.instance; 
 
 	let newStatus;
 
@@ -735,7 +736,7 @@ async function readPending(req: Request, res: Response) {
 
 }
 
-function createTicket(req: Request, res: Response) {
+async function createTicket(req: Request, res: Response) {
 	// CUSTOMER(VQ) -> QUEUED / REQUESTED 
 	// WAITER(VQ) -> QUEUED 
 
@@ -758,6 +759,9 @@ function createTicket(req: Request, res: Response) {
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
 
+
+	
+
 	Section.findById(idSection).then(async (sectionDB) => {
 
 		if (!sectionDB) {
@@ -768,9 +772,18 @@ function createTicket(req: Request, res: Response) {
 			})
 		}
 
+
+		const settings: any = await Settings.findOne({ id_company: sectionDB.id_company }).catch(()=>{
+			return res.status(400).json({
+				ok: false,
+				msg: 'No se pudieron obtener los ajustes del comercio',
+				ticket: null
+			})
+		})
+
 		let idPosition: Number | null = null;
 
-		// tiene intervalos entra por cola virtual, calculo la posición 
+		// Si NO tiene intervalos entra por cola virtual, calculo la posición 
 		if (tmIntervals.length === 0) {
 			// busco la posición que le corresponde en la cola virtual
 			let position = await Position.findOneAndUpdate({
@@ -805,12 +818,21 @@ function createTicket(req: Request, res: Response) {
 
 		} else {
 			// si tiene intervalos entra en agenda, verifico la consecutividad de los intervalos 
+
+			if(tmIntervals.length > settings.nm_intervals){
+				return res.status(400).json({
+					ok: false,
+					msg: 'Supera la cantidad máxima permitida de intervalos',
+					ticket: null
+				})
+			}
+
 			tmIntervals.sort();
 			for (let [index, interval] of tmIntervals.entries()) {
 				if (index === 0) continue;
 				let diff = new Date(tmIntervals[index]).getTime() - new Date(tmIntervals[index - 1]).getTime();
 				// if not 30min diff between intervals
-				if (diff !== 1800000) {
+				if (diff !== 1800000) { 
 					return res.status(400).json({
 						ok: false,
 						msg: 'Los intervalos deben ser consecutivos',
@@ -853,7 +875,6 @@ function createTicket(req: Request, res: Response) {
 		ticket.save().then(async (ticketSaved) => {
 
 			// obtengo las configuraciones para el comercio
-			const settings = await Settings.findOne({ id_company: ticketSaved.id_company });
 
 			server.io.to(sectionDB.id_company).emit('update-waiters');
 			server.io.to(sectionDB.id_company).emit('update-admin'); //schedule update
@@ -907,7 +928,6 @@ function createTicket(req: Request, res: Response) {
 	})
 
 };
-
 
 let every = (arr: any[], target: any[]) => target.every(v => arr.includes(v));
 let some = (arr: any[], target: any[]) => target.some(v => arr.includes(v));
