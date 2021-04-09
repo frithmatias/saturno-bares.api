@@ -8,12 +8,12 @@ const ftp = require("basic-ftp")
 import environment from '../global/environment.prod';
 import { User } from '../models/user.model';
 import path from 'path';
+import sharp from 'sharp';
 
 // ========================================================
 // Upload Methods
 // ========================================================
 
-// front -> [HTTP] -> heroku -> [FTP] -> hostinger
 async function uploadImagen(req: any, res: Response) {
 
     // ==============================================================
@@ -74,9 +74,9 @@ async function uploadImagen(req: any, res: Response) {
 
     // (..) in production
     var dirPath = `./uploads/${idDocument}/${idField}`;
-    var completePath = path.resolve(__dirname, '../', dirPath);
-    fileSystem.createFolder(completePath);
-    let filePath = `${completePath}/${fileName}`;
+    var absoluteDirPath = path.resolve(__dirname, '../', dirPath);
+    fileSystem.createFolder(absoluteDirPath);
+    let filePath = `${absoluteDirPath}/${fileName}`;
     await archivo.mv(filePath, (err: any) => {
         if (err) {
             return res.status(500).json({
@@ -85,13 +85,26 @@ async function uploadImagen(req: any, res: Response) {
                 filename: fileName
             });
         }
+
+        sharp(filePath)
+        .rotate()
+        .resize(300)
+        .jpeg({ mozjpeg: true })
+        .toBuffer()
+        .then( async (fileThumb) => {
+                   fs.writeFileSync(`${absoluteDirPath}/thumb-${fileName}`, fileThumb);
+            // await fileThumb.mv(filePath);
+        } )
+        .catch( err => {
+            console.log('Error al guardar el thumbnail ', err);
+        });
     });
 
     // ==============================================================
     // SAVE IMAGE IN DB
     // ==============================================================
 
-    grabarImagenBD(idField, idDocument, fileName, res).then(async (resp: any) => {
+    saveDB(idField, idDocument, fileName, res).then(async (resp: any) => {
         if (!resp.ok) {
             if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
             return res.status(400).json(resp)
@@ -125,8 +138,8 @@ function deleteImagen(req: Request, res: Response) {
 
             // (..) in production
             
-            var dirPath = `../uploads/${idDocument}/${idField}`;
-            var completePath = path.resolve(__dirname, '../', dirPath);
+            var dirPath = `./uploads/${idDocument}/${idField}`;
+            var absoluteDirPath = path.resolve(__dirname, '../', dirPath);
 
             if (idField === 'tx_company_images') {
                 if (fileName === 'todas') {
@@ -180,7 +193,7 @@ function deleteImagen(req: Request, res: Response) {
                 });
             }
 
-            var dirPath = `../uploads/${idDocument}/${idField}`;
+            var dirPath = `./uploads/${idDocument}/${idField}`;
 
 
             if (idField === 'tx_img') {
@@ -210,7 +223,7 @@ function deleteImagen(req: Request, res: Response) {
 
 }
 
-function grabarImagenBD(idField: string, idDocument: string, fileName: string, res: Response) {
+function saveDB(idField: string, idDocument: string, fileName: string, res: Response) {
 
     return new Promise((resolve, reject) => {
 
@@ -299,47 +312,7 @@ function grabarImagenBD(idField: string, idDocument: string, fileName: string, r
     })
 }
 
-
-async function syncHostinger(req: Request, res: Response) {
-
-        let idDocument = req.body.idDocument;
-        let idField = req.body.idField;
-
-        let dirPath = `../uploads/${idDocument}/${idField}`
-
-        const client = new ftp.Client();
-        client.ftp.verbose = false; 
-        try {
-            await client.access({
-                host: environment.FTP_HOST,
-                user: environment.FTP_USER,
-                password: environment.FTP_PASS,
-                secure: false
-            });
-            await client.ensureDir(dirPath);
-            await client.clearWorkingDir();
-            await client.uploadFromDir(dirPath);
-
-            client.close();
-
-            return res.status(200).json({
-                ok: true,
-                msg: 'Sincronizado con Hostinger correctamente'
-            })
-        }
-        catch (err) {
-
-            client.close();
-            return res.status(400).json({
-                ok: false,
-                msg: 'Error al Sincronizar con Hostinger'
-            })
-        }
-  
-}
-
 export = {
     uploadImagen,
-    deleteImagen,
-    syncHostinger
+    deleteImagen
 }

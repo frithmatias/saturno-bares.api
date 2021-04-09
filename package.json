@@ -28,6 +28,7 @@
 		"nodemailer": "^6.4.18",
 		"nodemon": "^2.0.7",
 		"rxjs": "^6.6.3",
+		"sharp": "^0.28.1",
 		"socket.io": "^2.3.0",
 		"typescript": "^3.9.7",
 		"urlsafe-base64": "^1.0.0",
@@ -44,6 +45,7 @@
 		"@types/node-cron": "^2.0.3",
 		"@types/node-telegram-bot-api": "^0.51.0",
 		"@types/nodemailer": "^6.4.0",
+		"@types/sharp": "^0.28.0",
 		"@types/socket.io": "^2.1.11",
 		"@types/urlsafe-base64": "^1.0.28",
 		"@types/web-push": "^3.3.0"

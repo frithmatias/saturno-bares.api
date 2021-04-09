@@ -11,5 +11,4 @@ const uploadRoutes = Router();
 
 uploadRoutes.put('/:idDocument/:idField', mdAuth.verificaToken, UploadController.uploadImagen);
 uploadRoutes.delete('/:idDocument/:idField/:fileName', mdAuth.verificaToken, UploadController.deleteImagen);
-uploadRoutes.post('/synchostinger', mdAuth.verificaToken, UploadController.syncHostinger)
 export default uploadRoutes;

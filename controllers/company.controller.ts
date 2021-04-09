@@ -37,7 +37,8 @@ function createCompany(req: Request, res: Response) {
       id_company: companySaved._id,
       bl_spm: true,
       bl_schedule: true,
-      bl_queue: true
+      bl_queue: true,
+      nm_intervals: 3
     })
 
     defaultSettings.save().then(settingsSaved => {
