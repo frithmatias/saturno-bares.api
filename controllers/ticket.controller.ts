@@ -1212,8 +1212,8 @@ function updateSocket(req: Request, res: Response) {
 	const server = Server.instance; // singleton
 
 	const idTicket = req.body.idTicket;
-	const newSocket = req.body.newSocket;
-	const isClient = req.body.isClient;
+	const txSocket = req.body.txSocket;
+	const blClient = req.body.blClient;
 	Ticket.findById(idTicket).then((ticketDB) => {
 
 		if (!ticketDB) {
@@ -1225,11 +1225,11 @@ function updateSocket(req: Request, res: Response) {
 
 		let requestUpdateTo: string;
 
-		if (isClient) {
-			ticketDB.id_socket_client = newSocket;
+		if (blClient) {
+			ticketDB.id_socket_client = txSocket;
 			if (ticketDB.id_socket_waiter) { requestUpdateTo = ticketDB.id_socket_waiter; }
 		} else {
-			ticketDB.id_socket_waiter = newSocket;
+			ticketDB.id_socket_waiter = txSocket;
 			if (ticketDB.id_socket_client) { requestUpdateTo = ticketDB.id_socket_client; }
 		}
 

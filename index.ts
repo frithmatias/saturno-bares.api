@@ -1,13 +1,11 @@
 //import { SERVER_PORT } from "./global/environment";
 import environment from './global/environment.prod';
 import Server from './classes/server';
-import bodyParser from 'body-parser';
 import fileUpload from 'express-fileupload';
 import cors from 'cors';
 import path from 'path';
 import express from 'express';
 import mongoose from 'mongoose';
-import compression from 'compression';
 import colors from './global/colors';
 
 // ROUTES
@@ -27,6 +25,8 @@ import uploadRoutes from './routes/upload.routes';
 import messengerRoutes from './routes/messenger.routes';
 import imageRoutes from './routes/image.routes';
 import settingsRoutes from './routes/settings.routes'; 
+import chatRoutes from './routes/chat.routes'; 
+
 
 // SINGLETON
 // const server = new Server();
@@ -46,10 +46,10 @@ const publicPath = path.resolve(__dirname, '../public');
 server.app.use(express.static(publicPath));
 
 // Lo que reciba por el body, lo toma y lo convierte en un objeto de JavaScript
-server.app.use(bodyParser.urlencoded({ extended: true }));
-server.app.use(bodyParser.json());
+server.app.use(express.urlencoded({ extended: true }));
+server.app.use(express.json());
 
-// express-fileupload
+// express-fileupload register middleware
 server.app.use(fileUpload());
 
 // CORS
@@ -74,6 +74,8 @@ server.app.use('/uploads', uploadRoutes);
 server.app.use('/m', messengerRoutes);
 server.app.use('/image', imageRoutes);
 server.app.use('/settings', settingsRoutes);
+server.app.use('/chat', chatRoutes);
+
 
 server.start(() => {
 	console.log('System: ', `Servidor corriendo en el puerto ${server.port}`); // ES lo mismo que que ${ SERVER_PORT }

@@ -22,7 +22,6 @@ async function uploadImagen(req: any, res: Response) {
 
     var idField = req.params.idField;
     var idDocument = req.params.idDocument;
-
     var idFieldsValid = ["tx_company_images", "tx_company_cover", "tx_company_logo", "tx_img"];
 
     if (!idFieldsValid.includes(idField)) {
@@ -72,12 +71,12 @@ async function uploadImagen(req: any, res: Response) {
     // SAVE FILE IN FILESYSTEM
     // ==============================================================
 
-    // (..) in production
     var dirPath = `./uploads/${idDocument}/${idField}`;
     var absoluteDirPath = path.resolve(__dirname, '../', dirPath);
     fileSystem.createFolder(absoluteDirPath);
     let filePath = `${absoluteDirPath}/${fileName}`;
     await archivo.mv(filePath, (err: any) => {
+
         if (err) {
             return res.status(500).json({
                 ok: false,
@@ -86,34 +85,43 @@ async function uploadImagen(req: any, res: Response) {
             });
         }
 
+        // ==============================================================
+        // SAVE THUMBNAIL IN FILESYSTEM
+        // ==============================================================
+
         sharp(filePath)
-        .rotate()
-        .resize(300)
-        .jpeg({ mozjpeg: true })
-        .toBuffer()
-        .then( async (fileThumb) => {
-                   fs.writeFileSync(`${absoluteDirPath}/thumb-${fileName}`, fileThumb);
-            // await fileThumb.mv(filePath);
-        } )
-        .catch( err => {
-            console.log('Error al guardar el thumbnail ', err);
-        });
+            .rotate()
+            .resize(300)
+            .jpeg({ mozjpeg: true })
+            .toBuffer()
+            .then(async (fileThumb) => {
+
+                fs.writeFileSync(`${absoluteDirPath}/thumb-${fileName}`, fileThumb);
+
+                // ==============================================================
+                // SAVE IMAGE IN DB
+                // ==============================================================
+
+                saveDB(idField, idDocument, fileName, res).then(async (resp: any) => {
+                    if (!resp.ok) {
+                        if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+                        return res.status(400).json(resp)
+                    }
+                    return res.status(200).json(resp);
+                }).catch((resp) => {
+                    if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+                    return res.status(400).json(resp)
+                })
+                
+            })
+            .catch(err => {
+                console.log('Error al guardar el thumbnail ', err);
+            });
+
+
     });
 
-    // ==============================================================
-    // SAVE IMAGE IN DB
-    // ==============================================================
 
-    saveDB(idField, idDocument, fileName, res).then(async (resp: any) => {
-        if (!resp.ok) {
-            if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-            return res.status(400).json(resp)
-        }
-        return res.status(200).json(resp);
-    }).catch((resp) => {
-        if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-        return res.status(400).json(resp)
-    })
 
 }
 
@@ -137,7 +145,7 @@ function deleteImagen(req: Request, res: Response) {
             }
 
             // (..) in production
-            
+
             var dirPath = `./uploads/${idDocument}/${idField}`;
             var absoluteDirPath = path.resolve(__dirname, '../', dirPath);
 
@@ -176,7 +184,7 @@ function deleteImagen(req: Request, res: Response) {
                     filename: fileName
                 });
 
- 
+
             });
         });
     }

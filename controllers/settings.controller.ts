@@ -1,4 +1,4 @@
-import { Request, response, Response } from 'express';
+import { Request, Response } from 'express';
 import { Settings } from '../models/settings.model';
 import Server from '../classes/server';
 

@@ -121,12 +121,12 @@ function loginUser(req: Request, res: Response) {
       var token = Token.getJwtToken({ newUser });
 
       userDB.tm_lastlogin = new Date();
-      if(userDB.id_role === 'CUSTOMER_ROLE' && body.bl_admin){
+      if (userDB.id_role === 'CUSTOMER_ROLE' && body.bl_admin) {
         // el usuario esta registrado como cliente pero intenta loguearse como un comercio
         // si llega la petición es porque acepta convertir el ROL a ADMIN en el frontend.
         userDB.id_role = 'ADMIN_ROLE';
       }
-      
+
 
       userDB.save().then(async () => {
 
@@ -211,7 +211,7 @@ async function loginSocial(req: Request, res: Response) {
             newUser.id_company = 'eliminado solo para el token';
             var token = Token.getJwtToken({ newUser });
 
-            if(userDB.id_role === 'CUSTOMER_ROLE' && isAdmin){
+            if (userDB.id_role === 'CUSTOMER_ROLE' && isAdmin) {
               // el usuario esta registrado como cliente pero intenta loguearse como un comercio
               // si llega la petición es porque acepta convertir el ROL a ADMIN en el frontend.
               userDB.id_role = 'ADMIN_ROLE';
@@ -225,14 +225,20 @@ async function loginSocial(req: Request, res: Response) {
 
                   let home;
                   switch (userDB.id_role) {
+                    case 'SUPERUSER_ROLE':
+                      home = '/superuser/home';
+                      break;
                     case 'ADMIN_ROLE':
                       home = '/admin/home';
+                      break;
+                    case 'WAITER_ROLE':
+                      home = '/waiter/home';
                       break;
                     case 'CUSTOMER_ROLE':
                       home = '/public/tickets';
                       break;
                     default:
-                      home = '/admin/role';
+                      home = '/nohomedefined';
                   };
 
                   res.status(200).json({
@@ -576,10 +582,27 @@ function obtenerMenu(txRole: string) {
       ]
     };
 
+    let menu_super = {
+      tx_titulo: 'Super User',
+      tx_url: '/admin/dashboard',
+      tx_icon: 'mdi  mdi-shield-key-outline',
+      items: [
+        {
+          tx_titulo: 'Home',
+          tx_url: '/superuser/home',
+          tx_icon: 'mdi mdi-home'
+        }, {
+          tx_titulo: 'Chat',
+          tx_icon: 'mdi mdi-page-layout-header',
+          tx_url: '/superuser/chat'
+        }
+      ]
+    };
+
     let menu_admin = {
       tx_titulo: 'Administrador',
       tx_url: '/admin/dashboard',
-      tx_icon: 'mdi  mdi-shield-star',
+      tx_icon: 'mdi  mdi-shield-star-outline',
       items: [
         {
           tx_titulo: 'Home',
@@ -634,10 +657,10 @@ function obtenerMenu(txRole: string) {
           tx_icon: 'mdi mdi-wizard-hat',
           tx_url: '/admin/wizard',
         }, {
-          tx_titulo: 'Web Page',
+          tx_titulo: 'Mi Portal',
           tx_icon: 'mdi   mdi-page-layout-header',
           tx_url: '/admin/webpage'
-        } 
+        }
       ]
     };
 
@@ -658,7 +681,9 @@ function obtenerMenu(txRole: string) {
       ]
     };
 
-    if (txRole === 'ADMIN_ROLE') {
+    if (txRole === 'SUPERUSER_ROLE') {
+      menu_return.push(menu_admin, menu_waiter, menu_indicadores, menu_super);
+    } else if (txRole === 'ADMIN_ROLE') {
       menu_return.push(menu_admin, menu_waiter, menu_indicadores);
     } else {
       menu_return.push(menu_waiter);

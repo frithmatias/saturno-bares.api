@@ -18,8 +18,8 @@ const ticketsSchema = new Schema({
     id_position: { type: Number, required: false }, // id_position -> queued, requested [but not reserved]
     id_socket_client: { type: String, required: false },
     id_socket_waiter: { type: String, required: false },
-
     tm_intervals: { type: [Date], required: false, default: [] },
+
     tm_start: { type: Date, required: true, default: + new Date() },
     tm_init: { type: Date, required: false, default: null },
     tm_call: { type: Date, required: false, default: null },
