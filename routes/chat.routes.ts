@@ -19,6 +19,7 @@ chatRoutes.post('/actualizarsocket/', mdAuth.verificaToken, ChatController.actua
 
 // assistant
 chatRoutes.get('/readchatsrequests', mdAuth.verificaToken, ChatController.readChatsRequests);
+chatRoutes.get('/readchatsnotinit', mdAuth.verificaToken, ChatController.readChatsNotInit);
 chatRoutes.post('/initializesession', mdAuth.verificaToken, ChatController.initializeSession);
 
 export default chatRoutes;

@@ -158,6 +158,26 @@ async function readChatsRequests(req: Request, res: Response) {
 
 }
 
+async function readChatsNotInit(req: Request, res: Response) {
+
+    const chatsNotInit: ChatSession[] = await ChatSession.find({ tm_init: null, tm_end: {$ne: null}}).populate('id_user');
+
+    if (!chatsNotInit) {
+        return res.status(400).json({
+            ok: false,
+            msg: 'No se obtuvieron sesiones de chat finalizadas y no inicializadas',
+            sessions: null
+        })
+    }
+
+    return res.status(200).json({
+        ok: true,
+        msg: 'Se obtuvieron sesiones de chat que no fueron inicializadas correctamente',
+        sessions: chatsNotInit
+    })
+
+}
+
 function actualizarSocket(req: Request, res: Response) {
 
     const idSession = req.body.idSession;
@@ -209,5 +229,6 @@ export = {
     initializeSession,
     endSession,
     readChatsRequests,
+    readChatsNotInit,
     actualizarSocket
 }

@@ -593,8 +593,12 @@ function obtenerMenu(txRole: string) {
           tx_icon: 'mdi mdi-home'
         }, {
           tx_titulo: 'Chat',
-          tx_icon: 'mdi mdi-page-layout-header',
+          tx_icon: 'mdi mdi-chat-outline',
           tx_url: '/superuser/chat'
+        }, {
+          tx_titulo: 'Chat No Atendidos',
+          tx_icon: 'mdi mdi-chat-alert-outline',
+          tx_url: '/superuser/chatnotinit'
         }
       ]
     };
