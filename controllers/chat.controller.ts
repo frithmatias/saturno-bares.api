@@ -160,7 +160,7 @@ async function readChatsRequests(req: Request, res: Response) {
 
 async function readChatsNotInit(req: Request, res: Response) {
 
-    const chatsNotInit: ChatSession[] = await ChatSession.find({ tm_init: null, tm_end: {$ne: null}}).populate('id_user');
+    const chatsNotInit: ChatSession[] = await ChatSession.find({ tm_init: null }).populate('id_user');
 
     if (!chatsNotInit) {
         return res.status(400).json({

@@ -13,28 +13,28 @@ self.addEventListener('install', e => {
       return cache.addAll([
         '/',
         '/2.2b201bbce8f335baed23.js',
-        '/6.ca4cf768f56307406e87.js',
+        '/6.b87920ca72bf8bf6d7c1.js',
         '/7.2659bf18d43b7d4e6a76.js',
         '/8.d5c456f49e77aafa8391.js',
-        '/9.a102d32e70c2431c5d39.js',
-        '/10.6fd0312b8f5c39ce57c8.js',
+        '/9.c757ac6c2c4745c281b3.js',
+        '/10.2ad46e344c5f6ae2196b.js',
         '/admin_schedule.314bfb77a946eb28111c.png',
-        '/bg-tile.0d3b88f7ce16723156b1.png',
         '/bghome.2374cce18f9d245fa1a9.jpg',
-        '/common.b940d5d79626aae57565.js',
-        '/main.475d467d7d07bac3c946.js',
-        '/polyfills.164a7b585585bfda7685.js',
+        '/common.514a9a3682e8808291f6.js',
+        '/food-red.0d3b88f7ce16723156b1.png',
+        '/main.29d02b056bbde00df9fd.js',
+        '/polyfills.70783a9f5a03890b8d8a.js',
         '/public_createticket.1a743b1980dd57890e22.png',
         '/public_map.b45a887fa628b9d62971.png',
         '/public_scores.3357dd204cbe02fd7d91.png',
         '/public_ticketform.026e9fb78859513df7c5.png',
         '/public_tickets.11b7f154fb8764573190.png',
-        '/runtime.d3a5c59d06d154594be5.js',
+        '/runtime.295471126249c038ce62.js',
         '/saturno-logo.a06910f315a45a70206d.png',
-        '/styles.9e927c6b6eab3459145d.css',
+        '/styles.69889c3f32f90fc51cde.css',
         '/waiter_tables.3f32ade65761a1adf34d.png',
         '/waiter_virtualqueue.deda2d88bfa36bef5034.png'
-        
+
       ])
     })
     .catch(() => {

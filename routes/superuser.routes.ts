@@ -11,6 +11,7 @@ const superuserRoutes = Router();
 
 superuserRoutes.post('/createmenu', mdAuth.verificaToken, SuperuserController.createMenu);
 superuserRoutes.get('/readmenu', mdAuth.verificaToken, SuperuserController.readMenu);
+superuserRoutes.get('/readallcompanies', mdAuth.verificaToken, SuperuserController.readAllCompanies);
 superuserRoutes.post('/updatemenu', mdAuth.verificaToken, SuperuserController.updateMenu);
 superuserRoutes.delete('/deletemenu/:idMenu', mdAuth.verificaToken, SuperuserController.deleteMenu);
 

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Company } from '../models/company.model';
 import { Menu } from '../models/menu.model';
 
 // ========================================================
@@ -69,12 +70,12 @@ function updateMenu(req: Request, res: Response) {
 
     Menu.findByIdAndUpdate(body._id, menu, { new: true })
         .then(menuDB => {
-            if(!menuDB){
+            if (!menuDB) {
                 return res.status(500).json({
                     ok: false,
                     msg: 'Ocurrio un error al actualizar el menu',
                     menuitem: null
-                }) 
+                })
             }
             return res.status(200).json({
                 ok: true,
@@ -108,10 +109,32 @@ function deleteMenu(req: Request, res: Response) {
     })
 }
 
+function readAllCompanies(req: Request, res: Response) {
+
+    Company.find({}).populate('id_user').then(allCompaniesDB => {
+
+        if (!allCompaniesDB) {
+            return res.status(400).json({
+                ok: false,
+                msg: 'No se pudieron obtener los comercios',
+                companies: null
+            })
+        }
+
+        return res.status(200).json({
+            ok: true,
+            msg: 'Comercios obtenidos correctamente',
+            companies: allCompaniesDB
+        })
+
+    })
+
+}
 
 export = {
     createMenu,
     readMenu,
     updateMenu,
     deleteMenu,
+    readAllCompanies
 }

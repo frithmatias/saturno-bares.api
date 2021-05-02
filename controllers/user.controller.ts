@@ -599,6 +599,10 @@ function obtenerMenu(txRole: string) {
           tx_titulo: 'Chat No Atendidos',
           tx_icon: 'mdi mdi-chat-alert-outline',
           tx_url: '/superuser/chatnotinit'
+        }, {
+          tx_titulo: 'Comercios',
+          tx_icon: 'mdi mdi-store',
+          tx_url: '/superuser/companies'
         }
       ]
     };
