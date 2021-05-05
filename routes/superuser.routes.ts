@@ -9,6 +9,7 @@ import SuperuserController from '../controllers/superuser.controller';
 // ROUTES
 const superuserRoutes = Router();
 
+superuserRoutes.get('/checksuper', mdAuth.verificaToken, SuperuserController.checkSuper);
 superuserRoutes.post('/createmenu', mdAuth.verificaToken, SuperuserController.createMenu);
 superuserRoutes.get('/readmenu', mdAuth.verificaToken, SuperuserController.readMenu);
 superuserRoutes.get('/readallcompanies', mdAuth.verificaToken, SuperuserController.readAllCompanies);

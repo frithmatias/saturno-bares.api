@@ -10,6 +10,8 @@ import { Menu } from '../models/menu.model';
 import https from 'https';
 import { Social, facebookBackendResponse } from '../models/social.model';
 
+const SUPERUSERS = environment.SUPERUSERS;
+
 // Google Login
 const GOOGLE_CLIENT_ID = environment.GOOGLE_CLIENT_ID;
 const { OAuth2Client } = require("google-auth-library");
@@ -152,7 +154,7 @@ function loginUser(req: Request, res: Response) {
           msg: 'Usuario logueado correctamente',
           token: token,
           user: userDB,
-          menu: await obtenerMenu(userDB.id_role),
+          menu: await obtenerMenu(userDB),
           home
         });
 
@@ -221,7 +223,7 @@ async function loginSocial(req: Request, res: Response) {
               .then(async userSaved => {
 
                 userSaved.tx_password = ":)";
-                await obtenerMenu(userDB.id_role).then(menu => {
+                await obtenerMenu(userDB).then(menu => {
 
                   let home;
                   switch (userDB.id_role) {
@@ -294,7 +296,7 @@ async function loginSocial(req: Request, res: Response) {
           user.save().then(async userSaved => {
 
             var token = Token.getJwtToken({ user });
-            await obtenerMenu(user.id_role).then(menu => {
+            await obtenerMenu(user).then(menu => {
 
               res.status(200).json({
                 ok: true,
@@ -536,7 +538,7 @@ async function verify(platform: string, user_token: string): Promise<any> {
 
 }
 
-function obtenerMenu(txRole: string) {
+function obtenerMenu(user: any) {
 
   return new Promise(resolve => {
 
@@ -689,23 +691,26 @@ function obtenerMenu(txRole: string) {
       ]
     };
 
-    if (txRole === 'SUPERUSER_ROLE') {
-      menu_return.push(menu_admin, menu_waiter, menu_indicadores, menu_super);
-    } else if (txRole === 'ADMIN_ROLE') {
+  if (user.id_role === 'ADMIN_ROLE') {
       menu_return.push(menu_admin, menu_waiter, menu_indicadores);
+      if(SUPERUSERS.includes(user.tx_email)) {
+        menu_return.push(menu_super);
+      } 
+      resolve(menu_return);
+
     } else {
       menu_return.push(menu_waiter);
+      resolve(menu_return);
     }
 
-    resolve(menu_return);
   })
 }
 
-function obtenerMenuDB(txRole: string, cdPricing: number = 0) {
+function obtenerMenuDB(user: any, cdPricing: number = 0) {
 
   return new Promise((resolve, reject) => {
     var cdRole: number[] = [];
-    switch (txRole) {
+    switch (user.id_role) {
       case 'WAITER_ROLE':
         cdRole = [0]; // waiter
         break;

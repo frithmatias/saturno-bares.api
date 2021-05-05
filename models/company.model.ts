@@ -9,7 +9,7 @@ var valdTypes = {
 const companySchema = new Schema({
 
   // company form
-  id_user: { type: Schema.Types.ObjectId, ref: 'User', required: [true, 'El id_user es necesario'] },
+  id_user: { type: String, ref: 'User', required: [true, 'El id_user es necesario'] },
   tx_company_type: { type: String, required: [true, 'El tx_company_type es necesario'], enum: valdTypes },
   tx_company_name: { type: String, unique: true, required: [true, 'El tx_company_name es necesario'] },
   tx_company_slogan: { type: String, required: false },

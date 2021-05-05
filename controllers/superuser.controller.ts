@@ -1,10 +1,17 @@
 import { Request, Response } from 'express';
 import { Company } from '../models/company.model';
 import { Menu } from '../models/menu.model';
+import environment from '../global/environment.prod';
 
 // ========================================================
 // Superuser Methods
 // ========================================================
+
+const SUPERUSERS: string[] = environment.SUPERUSERS;
+
+function checkSuper(req: any, res: Response) {
+    return res.status(200).send(SUPERUSERS.includes(req.usuario.tx_email) ? true : false);
+}
 
 function createMenu(req: Request, res: Response) {
 
@@ -132,6 +139,7 @@ function readAllCompanies(req: Request, res: Response) {
 }
 
 export = {
+    checkSuper,
     createMenu,
     readMenu,
     updateMenu,

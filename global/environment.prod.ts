@@ -18,7 +18,8 @@ if (env === 'produ') {
 		FTP_HOST: process.env.FTP_HOST,
 		FTP_USER: process.env.FTP_USER,
 		FTP_PASS: process.env.FTP_PASS,
-		SERVER_PORT: process.env.PORT
+		SERVER_PORT: process.env.PORT,
+		SUPERUSERS: process.env.SUPERUSERS
 	};
 } else {
 	var desar = require('./environment');
@@ -39,7 +40,9 @@ if (env === 'produ') {
 		FTP_HOST: desar.environment.FTP_HOST,
 		FTP_USER: desar.environment.FTP_USER,
 		FTP_PASS: desar.environment.FTP_PASS,
-		SERVER_PORT: desar.environment.SERVER_PORT
+		SERVER_PORT: desar.environment.SERVER_PORT,
+		SUPERUSERS: desar.environment.SUPERUSERS
+
 	};
 }
 

@@ -101,13 +101,13 @@ function readCompany(req: Request, res: Response) {
 
 function readCompanies(req: Request, res: Response) {
   var idUser = String(req.params.idUser);
-
+  console.log(idUser)
   Company.find({ id_user: idUser }).then(companiesDB => {
 
-    if (!companiesDB) {
+    if (companiesDB.length === 0) {
       return res.status(200).json({
         ok: false,
-        msg: "No existen empresas asociadas al user",
+        msg: "No existen empresas asociadas al usuario",
         companies: []
       });
     }
@@ -121,7 +121,7 @@ function readCompanies(req: Request, res: Response) {
   }).catch(() => {
     return res.status(500).json({
       ok: false,
-      msg: "Error al buscar empresas asociadas a un user",
+      msg: "Error al buscar empresas asociadas a un usuario",
       companies: null
     });
   })
