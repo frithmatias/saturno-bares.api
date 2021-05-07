@@ -4,12 +4,18 @@ import { Subscription } from '../models/subscription.model';
 
 import webpush from 'web-push';
 import * as keys from '../notifications/vapid.json';
+import { Notification } from '../models/notification.model';
 
 webpush.setVapidDetails(
     'mailto:matiasfrith@gmail.com', // por si los servicios cambian
     keys.publicKey,
     keys.privateKey
 );
+
+
+// ========================================================
+// PUSH Notifications Subscriptions
+// ========================================================
 
 function notificationSubscribe(req: Request, res: Response) {
 
@@ -76,8 +82,38 @@ function notificationPush(req: Request, res: Response) {
 
 }
 
+// ========================================================
+// SYSTEM Notifications 
+// ========================================================
+
+function readNotifications(req: Request, res: Response) {
+
+    const idOwner = req.body.idOwner;
+    Notification.find({ id_owner: idOwner })
+        .limit(10)
+        .sort({ tm_notification: -1 })
+        .then(notificationsDB => {
+
+            if (!notificationsDB) {
+                res.status(200).json({
+                    ok: false,
+                    msg: 'No hay notificaciones',
+                    notifications: null
+                })
+            }
+
+            res.status(200).json({
+                ok: true,
+                msg: 'Notificaciones obtenidas correctamente',
+                notifications: notificationsDB
+            })
+        })
+
+}
+
 export = {
     notificationSubscribe,
     notificationKey,
-    notificationPush
+    notificationPush,
+    readNotifications,
 }

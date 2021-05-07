@@ -100,8 +100,8 @@ function readCompany(req: Request, res: Response) {
 }
 
 function readCompanies(req: Request, res: Response) {
+
   var idUser = String(req.params.idUser);
-  console.log(idUser)
   Company.find({ id_user: idUser }).then(companiesDB => {
 
     if (companiesDB.length === 0) {

@@ -29,8 +29,8 @@ const ticketsSchema = new Schema({
 }, { collection: "tickets" })
 
 export interface Ticket extends Document {
-    id_company: any | string;
-    id_section: string;
+    id_company: any | string; // ani if company is populated
+    id_section: any | string; // any if section is populated
     id_session?: string | null; 
     nm_persons: number;
     bl_contingent: boolean;

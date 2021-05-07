@@ -12,5 +12,7 @@ const notificationRoutes = Router();
 notificationRoutes.post('/subscribe', NotificationController.notificationSubscribe);
 notificationRoutes.get('/key', NotificationController.notificationKey);
 notificationRoutes.post('/push', NotificationController.notificationPush);
+notificationRoutes.post('/readnotifications', NotificationController.readNotifications);
+
 
 export default notificationRoutes;

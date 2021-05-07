@@ -9,6 +9,7 @@ import { User } from '../models/user.model';
 import { Menu } from '../models/menu.model';
 import https from 'https';
 import { Social, facebookBackendResponse } from '../models/social.model';
+import { Notification } from '../models/notification.model';
 
 const SUPERUSERS = environment.SUPERUSERS;
 
@@ -111,6 +112,7 @@ function loginUser(req: Request, res: Response) {
       }
 
 
+
       // Si llego hasta acá, el user y la contraseña son correctas, creo el token
 
       // rompo la referencia con assign() y uso toObject() para usar extraer del objeto
@@ -147,7 +149,7 @@ function loginUser(req: Request, res: Response) {
             break;
         };
 
-
+   
         // ADMIN
         res.status(200).json({
           ok: true,
@@ -219,8 +221,7 @@ async function loginSocial(req: Request, res: Response) {
               userDB.id_role = 'ADMIN_ROLE';
             }
 
-            userDB.updateOne({ tm_lastlogin: new Date(), id_role: userDB.id_role })
-              .then(async userSaved => {
+            userDB.updateOne({ tm_lastlogin: new Date(), id_role: userDB.id_role }).then(async userSaved => {
 
                 userSaved.tx_password = ":)";
                 await obtenerMenu(userDB).then(menu => {
