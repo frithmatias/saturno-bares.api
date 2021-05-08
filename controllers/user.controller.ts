@@ -48,13 +48,25 @@ function registerUser(req: any, res: Response) {
   
   https://saturno.fun/activate/${userSaved.tx_email}/${hash}`;
 
-
-
+    // mail for validate account
     Mail.sendMail('registro', userSaved.tx_email, confirmEmailMessage).then(resp => {
       console.log('mail ok', resp);
     }).catch(err => {
       console.log('fallo', err)
     })
+
+    // welcome notification message
+
+    const notif = new Notification({
+      id_owner: userSaved._id,
+      tx_icon: 'mdi-hand',
+      tx_title: '¡Bienvenido!',
+      tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
+      tm_notification: new Date(),
+      tm_event: null
+    });
+
+    notif.save();
 
     res.status(201).json({
       ok: true,
@@ -296,6 +308,18 @@ async function loginSocial(req: Request, res: Response) {
 
           user.save().then(async userSaved => {
 
+
+            const notif = new Notification({
+              id_owner: userSaved._id,
+              tx_icon: 'mdi-hand',
+              tx_title: '¡Bienvenido!',
+              tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
+              tm_notification: new Date(),
+              tm_event: null
+            });
+            
+            notif.save();
+            
             var token = Token.getJwtToken({ user });
             await obtenerMenu(user).then(menu => {
 
