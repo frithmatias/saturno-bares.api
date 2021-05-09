@@ -28,7 +28,7 @@ function chatRequest(req: Request, res: Response) {
 
     chatSession.save().then((chatSessionSaved) => {
 
-        server.io.to('superuser').emit('update-clients-list'); // clients update
+        server.io.to('superuser').emit('update-clients-list'); // chat clients update
         return res.status(200).json({
             ok: true,
             msg: 'Sesión de chat iniciada correctamente',
@@ -202,7 +202,7 @@ function actualizarSocket(req: Request, res: Response) {
 
         sessionDB.save().then(sessionSaved => {
 
-            server.io.to('superuser').emit('update-clients-list'); // clients update
+            server.io.to('superuser').emit('update-clients-list'); // chat clients update
 
             return res.status(200).json({
                 ok: true,

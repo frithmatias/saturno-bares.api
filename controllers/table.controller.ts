@@ -132,7 +132,7 @@ let toggleTableStatus = (req: Request, res: Response) => {
         tableDB.save().then(statusSaved => {
 
             if (sectionDB) {
-                server.io.to(sectionDB.id_company).emit('update-waiters');
+                server.io.to(sectionDB.id_company).emit('update-waiter');
             }
 
             if (tableDB.tx_status === 'idle') {
@@ -254,8 +254,8 @@ let initTables = async (req: Request, res: Response) => {
             await table.save();
         }
 
-        server.io.to(section.id_company).emit('update-waiters');
-        server.io.to(section.id_company).emit('update-clients');
+        server.io.to(section.id_company).emit('update-waiter');
+        server.io.to(section.id_company).emit('update-client');
 
         if (ticket.id_socket_client) {
                 server.io.to(ticket.id_socket_client).emit('update-ticket', ticket);
@@ -391,9 +391,9 @@ let assignTablesRequested = (req: Request, res: Response) => {
         ticketDB.tx_status = newStatus;
         ticketDB.bl_priority = blPriority;
         ticketDB.save().then(ticketSaved => {
-            server.io.to(ticketSaved.id_company).emit('update-waiters'); // mesas proveídas
+            server.io.to(ticketSaved.id_company).emit('update-waiter'); // mesas proveídas
 
-            if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-clients'); // mesas proveídas
+            if (ticketSaved.id_socket_client) server.io.to(ticketSaved.id_socket_client).emit('update-client'); // mesas proveídas
 
             if (blPriority || blFirst) {
 

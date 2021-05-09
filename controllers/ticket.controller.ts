@@ -166,16 +166,16 @@ async function checkTickets() {
 						await table.save().then(() => {
 
 							const notif = new Notification({
-								id_owner: ticket.id_company._id,
+								id_owner: [ticket.id_company._id, ticket.id_section], // company->admin && section->waiter
 								tx_icon: 'mdi-clock-time-eleven-outline',
 								tx_title: 'Mesa Reservada',
-								tx_message: `El sistema acaba de reservar ${cdTablesStr} ${cdTables}. La reserva es a las _time_ a nombre de ${ticket.tx_name}`,
+								tx_message: `El sistema acaba de reservar ${cdTablesStr} ${cdTables} para las _time_ a nombre de ${ticket.tx_name}`,
 								tm_notification: new Date(),
 								tm_event: ticket.tm_intervals[0]
 							});
 							notif.save();
 
-							server.io.to(ticket.id_company._id).emit('update-waiters');
+							server.io.to(ticket.id_company._id).emit('update-waiter'); // table reserved
 							server.io.to(ticket.id_company._id).emit('update-admin'); // table reserved
 
 						})
@@ -245,10 +245,10 @@ Saturno.fun`;
 
 				const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
 				const notif = new Notification({
-					id_owner: ticket.id_company._id,
+					id_owner: [ticket.id_company._id, ticket.id_section],
 					tx_icon: 'mdi-handshake',
 					tx_title: 'Aprovisionando Reserva',
-					tx_message: `El sistema inició el aprovisionamiento de ${cdTablesStr} ${ticket.cd_tables}. La reserva es a las _time_ a nombre de ${ticket.tx_name}`,
+					tx_message: `El sistema inició el aprovisionamiento de ${cdTablesStr} ${ticket.cd_tables} para las _time_ a nombre de ${ticket.tx_name}`,
 					tm_notification: new Date(),
 					tm_event: ticket.tm_intervals[0]
 				});
@@ -257,7 +257,7 @@ Saturno.fun`;
 				//CRON IN-TIME: proveyendo ticket y estableciendo estado waiting a las mesas asignadas...
 				spm.provide(tablesToProvide, ticket).then(data => {
 					server.io.to(ticket.id_company._id).emit('update-admin'); // table provided
-					server.io.to(ticket.id_company._id).emit('update-waiters');
+					server.io.to(ticket.id_company._id).emit('update-waiter'); // table provided
 				})
 			})
 		}
@@ -295,7 +295,7 @@ Saturno.fun`;
 
 			const ticketUpdated = await Ticket.findByIdAndUpdate(ticket._id, { tm_end: new Date(), tx_status: 'terminated' }, { new: true });
 
-			server.io.to(ticket.id_company._id).emit('update-waiters');
+			server.io.to(ticket.id_company._id).emit('update-waiter');
 			if (ticketUpdated?.id_socket_client) {
 				server.io.to(ticketUpdated.id_socket_client).emit('update-ticket', ticketUpdated);
 			}
@@ -314,8 +314,8 @@ function attendedTicket(req: Request, res: Response) {
 	const idTicket = req.body.idTicket;
 	Ticket.findByIdAndUpdate(idTicket, { tx_call: null, tm_call: null }, { new: true }).then(ticketAttended => {
 		if (ticketAttended) {
-			server.io.to(ticketAttended.id_company).emit('update-waiters');
-			server.io.to(ticketAttended.id_company).emit('update-clients');
+			server.io.to(ticketAttended.id_company).emit('update-waiter');
+			server.io.to(ticketAttended.id_company).emit('update-client');
 			return res.status(200).json({
 				ok: true,
 				msg: 'El llamado al camarero fue atendido.',
@@ -388,7 +388,7 @@ function releaseTicket(req: Request, res: Response) {
 			}
 
 			// ticket released, update waiters table list
-			server.io.to(ticketReleased.id_company).emit('update-waiters');
+			server.io.to(ticketReleased.id_company).emit('update-waiter');
 
 			return res.status(200).json({
 				ok: true,
@@ -433,22 +433,30 @@ async function endTicket(req: Request, res: Response) {
 
 			if (newStatus === 'finished') {
 				const notif = new Notification({
-					id_owner: ticketCancelled.id_company,
+					id_owner: [ticketCancelled.id_company, ticketCancelled.id_section._id],
 					tx_icon: 'mdi-clock-time-eleven-outline',
-					tx_title: 'Ticket Finalizado',
-					tx_message: `Finalizó el ticket para ${cdTablesStr} ${ticketCancelled.cd_tables} para el _date_ a las _time_ a nombre de ${ticketCancelled.tx_name}.`,
+					tx_title: 'Reserva Finalizada',
+					tx_message: `Finalizó la sesión a nombre de ${ticketCancelled.tx_name} para ${cdTablesStr} ${ticketCancelled.cd_tables} para el _date_ a las _time_.`,
 					tm_notification: new Date(),
 					tm_event: ticketCancelled.tm_intervals[0] || null
 				});
 				notif.save();
 			}
 
+
 			if (newStatus === 'cancelled') {
+				
+				let txMessage = `El cliente ${ticketCancelled.tx_name} cancelo la reserva de ${cdTablesStr} ${ticketCancelled.cd_tables} en el sector ${ticketCancelled.id_section.tx_section}`
+				if (ticketCancelled.tm_intervals.length > 0) { txMessage = txMessage + ' para el _date_ a las _time_.'; }
+
+				// si se trata de un ticket cancelado en agenda sólo lo notifico al administrador, si es un ticket de cola virtual también notifico a los camareros
+				let idOwner = ticketCancelled.tm_intervals.length > 0 ? [ticketCancelled.id_company] : [ticketCancelled.id_company, ticketCancelled.id_section._id];
+				
 				const notif = new Notification({
-					id_owner: ticketCancelled.id_company,
+					id_owner: idOwner,
 					tx_icon: 'mdi-close-circle-outline',
 					tx_title: 'Reserva Cancelada',
-					tx_message: `El cliente cancelo la reserva de ${cdTablesStr} ${ticketCancelled.cd_tables} en el sector ${ticketCancelled.id_section.tx_section} para el _date_ a las _time_ a nombre de ${ticketCancelled.tx_name}.`,
+					tx_message: txMessage,
 					tm_notification: new Date(),
 					tm_event: ticketCancelled.tm_intervals[0] || null
 				});
@@ -457,6 +465,8 @@ async function endTicket(req: Request, res: Response) {
 
 			const server = Server.instance; // singleton
 			server.io.to(ticketCancelled.id_company).emit('update-admin'); // ticket finished or cancelled
+			server.io.to(ticketCancelled.id_company).emit('update-waiter'); // ticket finished or cancelled
+
 
 			if (ticketCancelled?.id_session) {
 
@@ -471,11 +481,21 @@ async function endTicket(req: Request, res: Response) {
 
 					// en una sesión de mesa puedo tener asignadas una o mas mesas
 					for (let idTable of sessionCanceled?.id_tables) {
+
 						await Table.findByIdAndUpdate(idTable, { tx_status: 'paused', id_ticket: null, id_session: null });
 					}
 
-
-					server.io.to(ticketCancelled.id_company).emit('update-waiters');
+					const cdTablesStr = ticketCancelled.cd_tables.length > 1 ? 'Fueron liberadas las mesas' : 'Se liberó la mesa';
+					const notif = new Notification({
+						id_owner: [ticketCancelled.id_section],
+						tx_icon: 'mdi-pause-circle-outline',
+						tx_title: 'Mesas Liberadas',
+						tx_message: `${cdTablesStr} ${ticketCancelled.cd_tables} a nombre de ${ticketCancelled.tx_name}.`,
+						tm_notification: new Date(),
+						tm_event: ticketCancelled.tm_intervals[0] || null
+					});
+					notif.save();
+					server.io.to(ticketCancelled.id_company).emit('update-waiter'); // table released
 
 					if (ticketCancelled.id_socket_client) {
 						server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
@@ -500,10 +520,10 @@ async function endTicket(req: Request, res: Response) {
 			} else {
 
 				const server = Server.instance; // singleton
-				server.io.to(ticketCancelled.id_company).emit('update-waiters');
-				server.io.to(ticketCancelled.id_company).emit('update-clients'); //ticket component
+				server.io.to(ticketCancelled.id_company).emit('update-waiter');
+				server.io.to(ticketCancelled.id_company).emit('update-client');
 				if (ticketCancelled.id_socket_client) {
-					server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled); // ticket-create component
+					server.io.to(ticketCancelled.id_socket_client).emit('update-ticket', ticketCancelled);
 				}
 				return res.status(200).json({
 					ok: true,
@@ -937,8 +957,6 @@ async function createTicket(req: Request, res: Response) {
 
 			} else if (txStatus === 'waiting') {
 
-
-
 				return res.status(201).json({
 					ok: true,
 					msg: 'Ticket esperando confirmación',
@@ -1085,11 +1103,11 @@ async function validateTicket(req: any, res: Response) {
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
 				const txIcon: string = ticketSaved.tx_status === 'pending' ? 'mdi-alert-circle-outline' : 'mdi-check-circle-outline';
-				const txTitle: string = ticketSaved.tx_status === 'pending' ? 'Solicitud de Reserva' : 'Nueva Reserva';
+				const txTitle: string = ticketSaved.tx_status === 'pending' ? 'Solicitud de Mesa Especial en Agenda' : 'Nueva Reserva';
 				const txMessage: string = ticketSaved.tx_status === 'pending' ? 'Debe asignar mesas a una solicitud pendiente' : 'Nueva reserva para ' + cdTablesStr + ' ' + ticketSaved.cd_tables;
 
 				const notif = new Notification({
-					id_owner: ticketSaved.id_company._id,
+					id_owner: [ticketSaved.id_company._id],
 					tx_icon: txIcon,
 					tx_title: txTitle,
 					tx_message: `${txMessage} en el sector ${ticketWaiting.id_section.tx_section} para el día _date_ a las _time_ a nombre de ${ticketSaved.tx_name}`,
@@ -1152,7 +1170,7 @@ function callWaiter(req: Request, res: Response) {
 
 		if (ticketAttended) {
 
-			server.io.to(ticketAttended.id_company).emit('update-waiters');
+			server.io.to(ticketAttended.id_company).emit('update-waiter');
 
 			return res.status(200).json({
 				ok: true,
@@ -1270,11 +1288,11 @@ function readTicket(req: Request, res: Response) {
 };
 
 function updateSocket(req: Request, res: Response) {
-	const server = Server.instance; // singleton
 
 	const idTicket = req.body.idTicket;
 	const txSocket = req.body.txSocket;
 	const blClient = req.body.blClient;
+
 	Ticket.findById(idTicket).then((ticketDB) => {
 
 		if (!ticketDB) {

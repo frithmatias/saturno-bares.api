@@ -3,6 +3,7 @@ import { TableSession } from "../models/table.session.model";
 import { Ticket } from "../models/ticket.model";
 import { Settings } from '../models/settings.model';
 import Server from './server';
+import { Notification } from "../models/notification.model";
 
 // SPM:
 // PUSH(), PULL() Y PROVIDE()
@@ -50,7 +51,20 @@ export default class Spm {
                 if (compatibleTablesDB.length === 0) {
                     Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then((ticketRequested) => {
                         resolve('Sin mesa compatible, el ticket quedo requerido');
+                        const notif = new Notification({
+                            id_owner: [ticket.id_company, ticket.id_section], // company->admin && section->waiter
+                            tx_icon: 'mdi-alert-circle-outline',
+                            tx_title: 'Solicitud de Mesa Especial Cola Virtual',
+                            tx_message: `Debe asignar mesas para una solicitud de mesa especial a nombre de ${ticket.tx_name}.`,
+                            tm_notification: new Date(),
+                            tm_event: null
+                        });
+                        notif.save();
+                        const server = Server.instance; // singleton
+                        server.io.to(ticket.id_company).emit('update-waiter'); // table reserved
+                        server.io.to(ticket.id_company).emit('update-admin'); // table reserved
                     })
+
                     return;
                 }
 
@@ -239,7 +253,7 @@ export default class Spm {
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
                                     const server = Server.instance; // singleton
-			                        server.io.to(ticket.id_company).emit('update-waiters');
+			                        server.io.to(ticket.id_company).emit('update-waiter');
                                     if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }

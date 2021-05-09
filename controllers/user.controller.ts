@@ -58,7 +58,7 @@ function registerUser(req: any, res: Response) {
     // welcome notification message
 
     const notif = new Notification({
-      id_owner: userSaved._id,
+      id_owner: [userSaved._id],
       tx_icon: 'mdi-hand',
       tx_title: '¡Bienvenido!',
       tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
@@ -310,7 +310,7 @@ async function loginSocial(req: Request, res: Response) {
 
 
             const notif = new Notification({
-              id_owner: userSaved._id,
+              id_owner: [userSaved._id],
               tx_icon: 'mdi-hand',
               tx_title: '¡Bienvenido!',
               tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
