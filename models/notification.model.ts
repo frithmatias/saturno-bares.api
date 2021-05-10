@@ -3,6 +3,7 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 const notificationSchema = new Schema({
     id_owner: { type: [String], required: [true, 'El id_owner es necesario'] },
+    id_read: { type: [String], required: false},
     tx_icon: { type: String, required: [true, 'El tx_icon es necesario'] },
     tx_title: { type: String, required: [true, 'El tx_title es necesario'] },
     tx_message: { type: String, required: [true, 'El tx_message es necesario'] },

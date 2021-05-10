@@ -19,16 +19,15 @@ const { OAuth2Client } = require("google-auth-library");
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function registerUser(req: any, res: Response) {
-  // register admins and customers
 
   var body = req.body;
-
   const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
+  
   var user = new User({
     bl_active: false,
-    tx_name: body.user.tx_name,
-    tx_email: body.user.tx_email,
-    tx_password: bcrypt.hashSync(body.user.tx_password, 10),
+    tx_name: body.tx_name,
+    tx_email: body.tx_email,
+    tx_password: bcrypt.hashSync(body.tx_password, 10),
     bl_social: false,
     tx_platform: 'email',
     tm_lastlogin: null,
@@ -59,13 +58,12 @@ function registerUser(req: any, res: Response) {
 
     const notif = new Notification({
       id_owner: [userSaved._id],
-      tx_icon: 'mdi-hand',
-      tx_title: '¡Bienvenido!',
-      tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
+      tx_icon: 'mdi-emoticon-happy-outline',
+      tx_title: `¡Bienvenido ${userSaved.tx_name}!`,
+      tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. No olvides que estamos en el chat para cualquier consulta.`,
       tm_notification: new Date(),
       tm_event: null
     });
-
     notif.save();
 
     res.status(201).json({
@@ -311,9 +309,9 @@ async function loginSocial(req: Request, res: Response) {
 
             const notif = new Notification({
               id_owner: [userSaved._id],
-              tx_icon: 'mdi-hand',
-              tx_title: '¡Bienvenido!',
-              tx_message: `Tu cuenta ya está creada, ahora podes dar de alta tu comercio desde el asistente. No olvides que estamos en el chat para cualquier consulta.`,
+              tx_icon: 'mdi-emoticon-happy-outline',
+              tx_title: `¡Bienvenido ${userSaved.tx_name}!`,
+              tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. No olvides que estamos en el chat para cualquier consulta.`,
               tm_notification: new Date(),
               tm_event: null
             });

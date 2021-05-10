@@ -111,9 +111,40 @@ function readNotifications(req: Request, res: Response) {
 
 }
 
+
+function updateNotificationsRead(req: Request, res: Response) {
+    
+    const idNotifications = req.body.idNotifications;
+    const idUser = req.body.idUser;
+
+    Notification.updateMany({ _id: {$in : idNotifications}}, {$push: {id_read: idUser}}).then(notificationsUpdated => {
+        res.status(200).json({
+            ok: true,
+            msg: 'Notificaciones guardadas como leidas correctamente',
+            notifications: notificationsUpdated
+        })
+    })
+}
+
+function updateNotificationRead(req: Request, res: Response) {
+    
+    const idNotification = req.body.idNotification;
+    const idUser = req.body.idUser;
+
+    Notification.findByIdAndUpdate(idNotification, {$push: {id_read: idUser}}).then(notificationUpdated => {
+        res.status(200).json({
+            ok: true,
+            msg: 'Notificacion guardada como leida correctamente',
+            notifications: notificationUpdated
+        })
+    })
+}
+
 export = {
     notificationSubscribe,
     notificationKey,
     notificationPush,
     readNotifications,
+    updateNotificationRead,
+    updateNotificationsRead
 }

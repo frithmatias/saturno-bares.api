@@ -13,6 +13,9 @@ notificationRoutes.post('/subscribe', NotificationController.notificationSubscri
 notificationRoutes.get('/key', NotificationController.notificationKey);
 notificationRoutes.post('/push', NotificationController.notificationPush);
 notificationRoutes.post('/readnotifications', NotificationController.readNotifications);
+notificationRoutes.post('/updatenotificationread', NotificationController.updateNotificationRead);
+notificationRoutes.post('/updatenotificationsread', NotificationController.updateNotificationsRead);
+
 
 
 export default notificationRoutes;

@@ -12,6 +12,7 @@ const userRoutes = Router();
 userRoutes.post('/updatetoken', UserController.updateToken);
 
 userRoutes.post('/loginsocial', UserController.loginSocial);
+
 userRoutes.post('/loginuser', UserController.loginUser);
 userRoutes.post('/registeruser', UserController.registerUser);
 
