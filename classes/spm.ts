@@ -51,13 +51,15 @@ export default class Spm {
                 if (compatibleTablesDB.length === 0) {
                     Ticket.findByIdAndUpdate(ticket._id, { tx_status: 'requested' }, { new: true }).then((ticketRequested) => {
                         resolve('Sin mesa compatible, el ticket quedo requerido');
-                        const notif = new Notification({
+                        const notif = new Notification({ // TICKET REQUESTED (CV)
                             id_owner: [ticket.id_company, ticket.id_section], // company->admin && section->waiter
                             tx_icon: 'mdi-alert-circle-outline',
                             tx_title: 'Solicitud de Mesa Especial Cola Virtual',
                             tx_message: `Debe asignar mesas para una solicitud de mesa especial a nombre de ${ticket.tx_name}.`,
                             tm_notification: new Date(),
-                            tm_event: null
+                            tm_event: null,
+                            tx_link: '/waiter/section'
+
                         });
                         notif.save();
                         const server = Server.instance; // singleton
@@ -74,10 +76,23 @@ export default class Spm {
                 if (idleTables.length === 0) {
                     // no hay disponibilidad queda en cola
                     resolve('Sin mesa disponible, el ticket quedo en cola');
+                    const notif = new Notification({ // TICKET QUEUED (CV)
+                        id_owner: [ticket.id_company, ticket.id_section], // company->admin && section->waiter
+                        tx_icon: 'mdi-human-queue',
+                        tx_title: 'Nuevo cliente esperando mesa',
+                        tx_message: `El cliente ${ticket.tx_name} espera una mesa para ${ticket.nm_persons}.`,
+                        tm_notification: new Date(),
+                        tm_event: null,
+                        tx_link: '/waiter/section'
+                    });
+                    notif.save();
+                    const server = Server.instance; // singleton
+                    server.io.to(ticket.id_company).emit('update-waiter'); // table reserved
+                    server.io.to(ticket.id_company).emit('update-admin'); // table reserved
                     return;
                 } else {
                     // todo: a provide() le debo pasar la mesa mas compatible, no la primera
-                    const respProvide = Spm.provide([idleTables[0]], ticket); 
+                    const respProvide = Spm.provide([idleTables[0]], ticket);
                     resolve(respProvide);
                     return;
                 }
@@ -116,9 +131,9 @@ export default class Spm {
                     if (ticketsDB.length === 0) { return resolve('Pull: No hay tickets asignados para esta mesa') }
 
                     // Secuencia en prioridad de asignación de mesa liberada con orden FIFO
-                                        
+
                     // 1. primer 'assigned' que le corresponda la mesa con priority true
-                    
+
                     // SPM: ON - AUTOMATIC  
                     // 2A. primer 'queued' compatible con la mesa con priority true
                     // 3A. primer 'assigned' que le corresponda la mesa ó 'queued' compatible con la mesa 
@@ -252,8 +267,21 @@ export default class Spm {
                             ticket.tm_provided = new Date();
                             await ticket.save().then(async ticketSaved => {
                                 if (index === tables.length - 1) {
+
+                                    const notif = new Notification({ // TICKET PROVIDED (CV)
+                                        id_owner: [ticket.id_company, ticket.id_section], // company->admin && section->waiter
+                                        tx_icon: 'mdi-silverware-fork-knife',
+                                        tx_title: 'Mesas proveídas',
+                                        tx_message: `El cliente ${ticket.tx_name} tiene mesa/s aprovisionadas. Por favor guíelo hacia su mesa.`,
+                                        tm_notification: new Date(),
+                                        tm_event: null,
+                                        tx_link: '/waiter/section'
+                                    });
+                                    notif.save();
                                     const server = Server.instance; // singleton
-			                        server.io.to(ticket.id_company).emit('update-waiter');
+                                    server.io.to(ticket.id_company).emit('update-waiter'); // table reserved
+                                    server.io.to(ticket.id_company).emit('update-admin'); // table reserved
+
                                     if (ticket.id_socket_client) { server.io.to(ticket.id_socket_client).emit('update-ticket', ticket); }
                                     return resolve(`Por favor, avise a ${ticket.tx_name} con el ticket ${ticket.id_position} que pase a la mesa ${ticket.cd_tables}`);
                                 }

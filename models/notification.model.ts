@@ -3,12 +3,13 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 const notificationSchema = new Schema({
     id_owner: { type: [String], required: [true, 'El id_owner es necesario'] },
-    id_read: { type: [String], required: false},
+    id_read: { type: [String], required: false },
     tx_icon: { type: String, required: [true, 'El tx_icon es necesario'] },
     tx_title: { type: String, required: [true, 'El tx_title es necesario'] },
     tx_message: { type: String, required: [true, 'El tx_message es necesario'] },
     tm_notification: { type: Date, required: [true, 'El tm_notification es necesario'] },
     tm_event: { type: Date, required: false },
+    tx_link: { type: String, required: false }
 
 }, { collection: "notifications" })
 
@@ -19,6 +20,7 @@ interface Notification extends Document {
     tx_message: string;
     tm_notification: Date;
     tm_event: Date;
+    tx_link: string;
 }
 notificationSchema.plugin(uniqueValidator, { message: 'El campo {PATH} debe de ser unico' });
 export const Notification = model<Notification>('Notification', notificationSchema);

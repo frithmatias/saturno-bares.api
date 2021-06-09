@@ -14,8 +14,8 @@ import * as socket from '../sockets/sockets';
 import * as telegram from '../sockets/telegram';
 
 const options = {
-	key: fs.readFileSync('./ssl/private.key'),
-	cert: fs.readFileSync('./ssl/certificate.crt')
+	key: fs.readFileSync('./ssl/210423-comodo/HSSL-6082c83831723.key'),
+	cert: fs.readFileSync('./ssl/210423-comodo/saturno_fun.crt')
 };
 
 export default class Server {

@@ -22,7 +22,7 @@ function registerUser(req: any, res: Response) {
 
   var body = req.body;
   const id_role = req.body.bl_admin ? 'ADMIN_ROLE' : 'CUSTOMER_ROLE';
-  
+
   var user = new User({
     bl_active: false,
     tx_name: body.tx_name,
@@ -56,13 +56,14 @@ function registerUser(req: any, res: Response) {
 
     // welcome notification message
 
-    const notif = new Notification({
+    const notif = new Notification({ // WELCOME MESSAGE (EMAIL)
       id_owner: [userSaved._id],
       tx_icon: 'mdi-emoticon-happy-outline',
       tx_title: `¡Bienvenido ${userSaved.tx_name}!`,
-      tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. No olvides que estamos en el chat para cualquier consulta.`,
+      tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. Te invitamos a iniciar el asistente. No olvides que estamos en el chat para cualquier consulta.`,
       tm_notification: new Date(),
-      tm_event: null
+      tm_event: null,
+      tx_link: '/admin/wizard'
     });
     notif.save();
 
@@ -159,7 +160,7 @@ function loginUser(req: Request, res: Response) {
             break;
         };
 
-   
+
         // ADMIN
         res.status(200).json({
           ok: true,
@@ -233,59 +234,59 @@ async function loginSocial(req: Request, res: Response) {
 
             userDB.updateOne({ tm_lastlogin: new Date(), id_role: userDB.id_role }).then(async userSaved => {
 
-                userSaved.tx_password = ":)";
-                await obtenerMenu(userDB).then(menu => {
+              userSaved.tx_password = ":)";
+              await obtenerMenu(userDB).then(menu => {
 
-                  let home;
-                  switch (userDB.id_role) {
-                    case 'SUPERUSER_ROLE':
-                      home = '/superuser/home';
-                      break;
-                    case 'ADMIN_ROLE':
-                      home = '/admin/home';
-                      break;
-                    case 'WAITER_ROLE':
-                      home = '/waiter/home';
-                      break;
-                    case 'CUSTOMER_ROLE':
-                      home = '/public/tickets';
-                      break;
-                    default:
-                      home = '/nohomedefined';
-                  };
+                let home;
+                switch (userDB.id_role) {
+                  case 'SUPERUSER_ROLE':
+                    home = '/superuser/home';
+                    break;
+                  case 'ADMIN_ROLE':
+                    home = '/admin/home';
+                    break;
+                  case 'WAITER_ROLE':
+                    home = '/waiter/home';
+                    break;
+                  case 'CUSTOMER_ROLE':
+                    home = '/public/tickets';
+                    break;
+                  default:
+                    home = '/nohomedefined';
+                };
 
-                  res.status(200).json({
-                    ok: true,
-                    msg: 'Usuario logueado correctamente',
-                    token: token,
-                    user: userDB,
-                    menu,
-                    home
-                  });
-
-                }).catch(() => {
-
-                  res.status(500).json({
-                    ok: false,
-                    msg: 'No se pudo obtener el menu del usuario',
-                    token: null,
-                    user: null,
-                    menu: null,
-                    home: null
-                  })
-
-                })
-
-
-              }).catch((err) => {
-
-                return res.status(400).json({
-                  ok: false,
-                  msg: 'Error al loguear el user de Google',
-                  err
+                res.status(200).json({
+                  ok: true,
+                  msg: 'Usuario logueado correctamente',
+                  token: token,
+                  user: userDB,
+                  menu,
+                  home
                 });
 
+              }).catch(() => {
+
+                res.status(500).json({
+                  ok: false,
+                  msg: 'No se pudo obtener el menu del usuario',
+                  token: null,
+                  user: null,
+                  menu: null,
+                  home: null
+                })
+
+              })
+
+
+            }).catch((err) => {
+
+              return res.status(400).json({
+                ok: false,
+                msg: 'Error al loguear el user de Google',
+                err
               });
+
+            });
 
           }
 
@@ -307,17 +308,18 @@ async function loginSocial(req: Request, res: Response) {
           user.save().then(async userSaved => {
 
 
-            const notif = new Notification({
+            const notif = new Notification({ // WELCOME MESSAGE (SOCIAL)
               id_owner: [userSaved._id],
               tx_icon: 'mdi-emoticon-happy-outline',
               tx_title: `¡Bienvenido ${userSaved.tx_name}!`,
-              tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. No olvides que estamos en el chat para cualquier consulta.`,
+              tx_message: `Acá vas a recibir notificaciones sobre nuevas reservas y el estado de tus mesas. Te invitamos a iniciar el asistente. No olvides que estamos en el chat para cualquier consulta.`,
               tm_notification: new Date(),
-              tm_event: null
+              tm_event: null,
+              tx_link: '/admin/wizard'
             });
-            
+
             notif.save();
-            
+
             var token = Token.getJwtToken({ user });
             await obtenerMenu(user).then(menu => {
 
@@ -714,11 +716,11 @@ function obtenerMenu(user: any) {
       ]
     };
 
-  if (user.id_role === 'ADMIN_ROLE') {
+    if (user.id_role === 'ADMIN_ROLE') {
       menu_return.push(menu_admin, menu_waiter, menu_indicadores);
-      if(SUPERUSERS.includes(user.tx_email)) {
+      if (SUPERUSERS.includes(user.tx_email)) {
         menu_return.push(menu_super);
-      } 
+      }
       resolve(menu_return);
 
     } else {

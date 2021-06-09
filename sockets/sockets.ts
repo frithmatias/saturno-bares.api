@@ -17,7 +17,6 @@ export const clientConnected = (cliente: Socket, io: socketIO.Server) => {
 	});
 
 	cliente.on('chat-message', (payload: { to: string, msg: string }) => {
-		console.log(payload);
 		io.to(payload.to).emit('chat-message', payload.msg);
 	});
 };

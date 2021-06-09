@@ -165,13 +165,16 @@ async function checkTickets() {
 
 						await table.save().then(() => {
 
-							const notif = new Notification({
+
+							const notif = new Notification({ // TABLE RESERVED (SCHEDULE)
 								id_owner: [ticket.id_company._id, ticket.id_section], // company->admin && section->waiter
 								tx_icon: 'mdi-clock-time-eleven-outline',
 								tx_title: 'Mesa Reservada',
 								tx_message: `El sistema acaba de reservar ${cdTablesStr} ${cdTables} para las _time_ a nombre de ${ticket.tx_name}`,
 								tm_notification: new Date(),
-								tm_event: ticket.tm_intervals[0]
+								tm_event: ticket.tm_intervals[0],
+								tx_link: '/waiter/section'
+
 							});
 							notif.save();
 
@@ -244,13 +247,15 @@ Saturno.fun`;
 				}
 
 				const cdTablesStr = ticket.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
-				const notif = new Notification({
+
+				const notif = new Notification({ // TABLE PROVIDED (SCHEDULE)
 					id_owner: [ticket.id_company._id, ticket.id_section],
 					tx_icon: 'mdi-handshake',
 					tx_title: 'Aprovisionando Reserva',
 					tx_message: `El sistema inició el aprovisionamiento de ${cdTablesStr} ${ticket.cd_tables} para las _time_ a nombre de ${ticket.tx_name}`,
 					tm_notification: new Date(),
-					tm_event: ticket.tm_intervals[0]
+					tm_event: ticket.tm_intervals[0],
+					tx_link: '/waiter/section'
 				});
 				notif.save();
 
@@ -431,8 +436,9 @@ async function endTicket(req: Request, res: Response) {
 
 			const cdTablesStr = ticketCancelled.cd_tables.length > 1 ? 'las mesas' : 'la mesa';
 
+
 			if (newStatus === 'finished') {
-				const notif = new Notification({
+				const notif = new Notification({ // TICKET FINISHED
 					id_owner: [ticketCancelled.id_company, ticketCancelled.id_section._id],
 					tx_icon: 'mdi-clock-time-eleven-outline',
 					tx_title: 'Reserva Finalizada',
@@ -445,14 +451,15 @@ async function endTicket(req: Request, res: Response) {
 
 
 			if (newStatus === 'cancelled') {
-				
+
 				let txMessage = `El cliente ${ticketCancelled.tx_name} cancelo la reserva de ${cdTablesStr} ${ticketCancelled.cd_tables} en el sector ${ticketCancelled.id_section.tx_section}`
 				if (ticketCancelled.tm_intervals.length > 0) { txMessage = txMessage + ' para el _date_ a las _time_.'; }
 
 				// si se trata de un ticket cancelado en agenda sólo lo notifico al administrador, si es un ticket de cola virtual también notifico a los camareros
 				let idOwner = ticketCancelled.tm_intervals.length > 0 ? [ticketCancelled.id_company] : [ticketCancelled.id_company, ticketCancelled.id_section._id];
-				
-				const notif = new Notification({
+
+
+				const notif = new Notification({ // TICKET CANCELLED
 					id_owner: idOwner,
 					tx_icon: 'mdi-close-circle-outline',
 					tx_title: 'Reserva Cancelada',
@@ -486,13 +493,14 @@ async function endTicket(req: Request, res: Response) {
 					}
 
 					const cdTablesStr = ticketCancelled.cd_tables.length > 1 ? 'Fueron liberadas las mesas' : 'Se liberó la mesa';
-					const notif = new Notification({
+					const notif = new Notification({ // TABLE RELEASED
 						id_owner: [ticketCancelled.id_section],
 						tx_icon: 'mdi-pause-circle-outline',
 						tx_title: 'Mesas Liberadas',
 						tx_message: `${cdTablesStr} ${ticketCancelled.cd_tables} a nombre de ${ticketCancelled.tx_name}.`,
 						tm_notification: new Date(),
-						tm_event: ticketCancelled.tm_intervals[0] || null
+						tm_event: ticketCancelled.tm_intervals[0] || null,
+						tx_link: '/waiter/section'
 					});
 					notif.save();
 					server.io.to(ticketCancelled.id_company).emit('update-waiter'); // table released
@@ -818,7 +826,7 @@ async function createTicket(req: Request, res: Response) {
 	const txName: string = req.body.txName;
 	const nmPersons: number = req.body.nmPersons;
 	const idSection: string = req.body.idSection;
-	const tmIntervals: Date[] = req.body.tmIntervals; // [] vacio si no hay reserva ( selecciona 'ahora' y entra por cola virtual )
+	const tmIntervals: Date[] = req.body.tmIntervals || []; // [] vacio si no hay reserva ( selecciona 'ahora' y entra por cola virtual )
 	const cdTables: number[] = req.body.cdTables;
 	const blContingent: boolean = req.body.blContingent;
 	const idSocket: string = req.body.idSocket || null; // admin/waiter contingency has not socket
@@ -830,7 +838,7 @@ async function createTicket(req: Request, res: Response) {
 	const thisDay = + new Date().getDate();
 	const thisMonth = + new Date().getMonth() + 1;
 	const thisYear = + new Date().getFullYear();
-
+	console.log(req.body)
 	Section.findById(idSection).then(async (sectionDB) => {
 
 		if (!sectionDB) {
@@ -852,7 +860,7 @@ async function createTicket(req: Request, res: Response) {
 		let idPosition: Number | null = null;
 
 		// Si NO tiene intervalos entra por cola virtual, calculo la posición 
-		if (tmIntervals.length === 0) {
+		if (tmIntervals?.length === 0) {
 			// busco la posición que le corresponde en la cola virtual
 			let position = await Position.findOneAndUpdate({
 				id_section: idSection,
@@ -985,10 +993,11 @@ async function createTicket(req: Request, res: Response) {
 		})
 
 
-	}).catch(() => {
+	}).catch((err) => {
+		console.log('Error', err)
 		return res.status(400).json({
 			ok: false,
-			msg: 'No se pudo obtener el sector solicitado',
+			msg: err,
 			ticket: null
 		})
 	})
@@ -1102,19 +1111,32 @@ async function validateTicket(req: any, res: Response) {
 
 			await ticketWaiting.save().then((ticketSaved: Ticket) => {
 
-				const txIcon: string = ticketSaved.tx_status === 'pending' ? 'mdi-alert-circle-outline' : 'mdi-check-circle-outline';
-				const txTitle: string = ticketSaved.tx_status === 'pending' ? 'Solicitud de Mesa Especial en Agenda' : 'Nueva Reserva';
-				const txMessage: string = ticketSaved.tx_status === 'pending' ? 'Debe asignar mesas a una solicitud pendiente' : 'Nueva reserva para ' + cdTablesStr + ' ' + ticketSaved.cd_tables;
+				if (ticketSaved.tx_status === 'pending') {
+					const notif = new Notification({ // NEW TICKET PENDING
+						id_owner: [ticketSaved.id_company._id],
+						tx_icon: 'mdi-alert-circle-outline',
+						tx_title: 'Solicitud de Mesa Especial en Agenda',
+						tx_message: `Debe asignar mesas a una solicitud pendiente en el sector ${ticketWaiting.id_section.tx_section} para el día _date_ a las _time_ a nombre de ${ticketSaved.tx_name}`,
+						tm_notification: new Date(),
+						tm_event: ticketSaved.tm_intervals[0],
+						tx_link: '/admin/schedule'
+					});
+					notif.save();
+				}
 
-				const notif = new Notification({
-					id_owner: [ticketSaved.id_company._id],
-					tx_icon: txIcon,
-					tx_title: txTitle,
-					tx_message: `${txMessage} en el sector ${ticketWaiting.id_section.tx_section} para el día _date_ a las _time_ a nombre de ${ticketSaved.tx_name}`,
-					tm_notification: new Date(),
-					tm_event: ticketSaved.tm_intervals[0]
-				});
-				notif.save();
+				if (ticketSaved.tx_status === 'scheduled') {
+					const notif = new Notification({ // NEW TICKET SCHEDULED
+						id_owner: [ticketSaved.id_company._id],
+						tx_icon: 'mdi-check-circle-outline',
+						tx_title: 'Nueva Reserva',
+						tx_message: `Nueva reserva para ${cdTablesStr} ${ticketSaved.cd_tables} en el sector ${ticketWaiting.id_section.tx_section} para el día _date_ a las _time_ a nombre de ${ticketSaved.tx_name}`,
+						tm_notification: new Date(),
+						tm_event: ticketSaved.tm_intervals[0],
+						tx_link: '/admin/schedule'
+					});
+					notif.save();
+				}
+
 				server.io.to(ticketSaved.id_company._id).emit('update-admin'); // new ticket validated! -> pending or scheduled
 
 				// QUEDO AGENDADO Y ASIGNADO

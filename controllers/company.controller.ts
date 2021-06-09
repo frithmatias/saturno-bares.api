@@ -5,12 +5,18 @@ import { Table } from '../models/table.model';
 import { Section } from '../models/section.model';
 import { Settings } from '../models/settings.model';
 import { ScoreItem } from '../models/scoreitem.model';
+import { Notification } from '../models/notification.model';
+import Server from '../classes/server';
 
 // ========================================================
 // Company Methods
 // ========================================================
 
 function createCompany(req: Request, res: Response) {
+
+  const server = Server.instance; // singleton
+
+
   // Save Company
   var body = req.body;
 
@@ -32,6 +38,17 @@ function createCompany(req: Request, res: Response) {
 
   company.save().then((companySaved) => {
 
+    const notif = new Notification({ // CONFIG PORTAL
+      id_owner: [companySaved._id],
+      tx_icon: 'mdi-web',
+      tx_title: `Completa tu Portal Web`,
+      tx_message: `Tu comercio ${companySaved.tx_company_name} ya está creado. Te invitamos a configurar tu portal web haciendo click acá.`,
+      tm_notification: new Date(),
+      tm_event: null,
+      tx_link: '/admin/webpage'
+    });
+    notif.save();
+    server.io.to(companySaved._id).emit('update-admin'); // table reserved
 
     let defaultSettings = new Settings({
       id_company: companySaved._id,
@@ -150,10 +167,10 @@ function updateCover(req: Request, res: Response) {
 
   const idCompany = req.body.idCompany;
   const coverFilename = req.body.coverFilename;
-  
-  Company.findByIdAndUpdate(idCompany, {tx_company_cover: coverFilename}, {new: true}).then(companyDB => {
 
-    if(!companyDB){
+  Company.findByIdAndUpdate(idCompany, { tx_company_cover: coverFilename }, { new: true }).then(companyDB => {
+
+    if (!companyDB) {
       return res.status(400).json({
         ok: false,
         msg: 'No existe el comercio para el cual desesa guardar la portada',
@@ -164,7 +181,7 @@ function updateCover(req: Request, res: Response) {
     return res.status(200).json({
       ok: true,
       msg: 'La portada fue actualizada correctamente',
-      company: companyDB 
+      company: companyDB
     })
 
   })
@@ -175,10 +192,10 @@ function updateTheme(req: Request, res: Response) {
 
   const idCompany = req.body.idCompany;
   const themeFilename = req.body.themeFilename;
-  
-  Company.findByIdAndUpdate(idCompany, {tx_theme: themeFilename}, {new: true}).then(companyDB => {
 
-    if(!companyDB){
+  Company.findByIdAndUpdate(idCompany, { tx_theme: themeFilename }, { new: true }).then(companyDB => {
+
+    if (!companyDB) {
       return res.status(400).json({
         ok: false,
         msg: 'No existe el comercio para el cual desesa guardar el tema',
@@ -189,7 +206,7 @@ function updateTheme(req: Request, res: Response) {
     return res.status(200).json({
       ok: true,
       msg: 'El tema fue actualizado correctamente',
-      company: companyDB 
+      company: companyDB
     })
 
   })

@@ -1,5 +1,5 @@
-const CACHE_SHELL = 'cache-shell-0.8'
-const CACHE_ASSETS = 'cache-assets-0.8'
+const CACHE_SHELL = 'cache-shell-2.7.12'
+const CACHE_ASSETS = 'cache-assets-2.7.12'
 
 // ----------------------------------------------------------
 // app shell
@@ -12,26 +12,26 @@ self.addEventListener('install', e => {
       // waitUntil espera una promesa por lo tanto tengo que usar RETURN
       return cache.addAll([
         '/',
-        '/2.2b201bbce8f335baed23.js',
-        '/6.75e02fd02bcc3f879bd5.js',
-        '/7.6980c5c7c025a54131af.js',
+        '/2.5e06b136251db4feaafc.js',
+        '/6.893cb0e85bc4da6c37ce.js',
+        '/7.db3fac2c1095c1a81646.js',
         '/8.7a49a1c3141f8956c339.js',
         '/9.a90bafa87b2138555a69.js',
-        '/10.068580dc08b3c63f54d4.js',
+        '/10.b4ae6036d59b64149b31.js',
         '/admin_schedule.314bfb77a946eb28111c.png',
-        '/bghome.2374cce18f9d245fa1a9.jpg',
+        '/bghome.d7e22d58974a14d07932.jpg',
         '/common.514a9a3682e8808291f6.js',
         '/food-red.0d3b88f7ce16723156b1.png',
-        '/main.0a19ed23be936cf9d9be.js',
+        '/main.73054bba9d248a2fb020.js',
         '/polyfills.70783a9f5a03890b8d8a.js',
         '/public_createticket.1a743b1980dd57890e22.png',
         '/public_map.b45a887fa628b9d62971.png',
         '/public_scores.3357dd204cbe02fd7d91.png',
         '/public_ticketform.026e9fb78859513df7c5.png',
         '/public_tickets.11b7f154fb8764573190.png',
-        '/runtime.f13d918f7f7c9f47c410.js',
+        '/runtime.869ea82a1069d3d45004.js',
         '/saturno-logo.a06910f315a45a70206d.png',
-        '/styles.a9b3bd053a9bbb5f18b9.css',
+        '/styles.c39ff60c4935cdff86c5.css',
         '/waiter_tables.3f32ade65761a1adf34d.png',
         '/waiter_virtualqueue.deda2d88bfa36bef5034.png'
 
@@ -51,7 +51,7 @@ self.addEventListener('install', e => {
         '/assets/bell.wav',
         '/assets/css/pwa.css',
         '/assets/themes/dark-pink.css',
-        '/assets/themes/dark-purple.css',
+        '/assets/themes/dark-green.css',
         '/assets/themes/grey-dark.css',
         '/assets/themes/grey-orange.css',
         '/assets/themes/light-blue.css',
